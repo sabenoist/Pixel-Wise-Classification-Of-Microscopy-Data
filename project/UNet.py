@@ -115,7 +115,7 @@ def train_UNet(unet, inputs, width_out, height_out, epochs=1):
     optimizer = torch.optim.SGD(unet.parameters(), lr = 0.01, momentum=0.99)
     optimizer.zero_grad()
 
-    for epoch in epochs:
+    for epoch in range(epochs):
         for input in inputs:
             output = unet(input)
 
@@ -134,5 +134,5 @@ def train_UNet(unet, inputs, width_out, height_out, epochs=1):
 
 inputs = []
 
-unet = UNet(in_channel=3, out_channel=2) #out_channel represents number of segments desired
+unet = UNet(in_channel=5, out_channel=2) #out_channel represents number of segments desired
 
