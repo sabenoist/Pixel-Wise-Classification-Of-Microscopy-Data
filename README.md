@@ -11,6 +11,5 @@ Sequence models for the analysis of time-lapse microscopy data.
 	<li>pandas</li>
 	<li>pims</li>
 	<li>seaborn</li>
-	<li>conda-foge</li>
 	<li>scikit-image</li>
 </ul>
