@@ -136,34 +136,3 @@ inputs = []
 
 unet = UNet(in_channel=3, out_channel=2) #out_channel represents number of segments desired
 
-
-
-
-
-
-'''
-batch_size = 8
-input_channels = 4
-
-
-def input_channels(self, channels):
-    samples = self.split_into_samples(channels)
-
-    for i in range(0, len(samples), batch_size):
-        batch = samples[i:i + batch_size]
-
-
-def split_into_samples(self, channels):
-    cropped = list()
-
-    for x in range(0, len(channels[0]), batch_size):
-        for y in range(0, len(channels[0][0]), batch_size):
-            sample = list()
-
-            for channel in channels:
-                sample.append(channel[x:x + batch_size, y:y + batch_size])
-
-            cropped.append(sample)
-
-    return cropped
-'''

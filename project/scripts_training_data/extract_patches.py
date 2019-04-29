@@ -149,7 +149,7 @@ def check_patch(img, y, x, offset, params):
 
     patch = img[y+offset : y+offset + small_patch_size[0], x + offset : x + offset + small_patch_size[1]]#, :]
 
-    print("img.shape: " + str(img.shape) + ", patch.shape: " + str(patch.shape) + ", label_class: " + str(label_class))
+    # print("img.shape: " + str(img.shape) + ", patch.shape: " + str(patch.shape) + ", label_class: " + str(label_class))
 
     if patch[:,:,label_class].sum() > params['min_pixels']:
     #if patch[patch == label_class].sum() > params['min_pixels']:
