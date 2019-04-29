@@ -1,4 +1,6 @@
 # Data files
+*.iml
+*.xml
 *.tif
 *.txt
 
