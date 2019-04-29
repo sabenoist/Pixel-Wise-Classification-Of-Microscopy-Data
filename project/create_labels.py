@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 
 dataset = '20190326'
 
-root_dir = 'D:/Bachelor_Project/code/project/datasets/{}/'.format(dataset)
+root_dir = 'D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
 out_dir = '{}/patches/'.format(root_dir)
 
 label_in_path = '{}/segmented_bordered/'.format(root_dir)
