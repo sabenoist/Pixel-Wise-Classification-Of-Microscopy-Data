@@ -33,7 +33,7 @@ def compute_training_set_statistics(patch_path):
 	patch_list = [a for a in os.listdir(patch_path) if a.endswith('.tif')]
 	existingAggregate = (0,0,0)
 
-	for p in patch_list:  #TODO remove slice
+	for p in patch_list:
 		clear_output(wait=True)
 		print(p)
 
@@ -50,16 +50,12 @@ def count_classes(gt_path):
 
 	classes = np.zeros(3)  # seems to be expecting 5 dimensions instead of 3..
 
-	for p in patches:  #TODO remove slice
+	for p in patches:
 		clear_output(wait=True)
 		print(p)
 
 		patch = io.imread('{}/{}'.format(gt_path, p))
-
-		patch = np.rollaxis(patch, np.argmin(patch.shape), 3)       # <-- is kept at the same place now..
-
-		# print(np.sum(patch, axis=0))
-		# print(np.sum(np.sum(patch, axis=0), axis=0))
+		patch = np.rollaxis(patch, np.argmin(patch.shape), 3)
 
 		classes += np.sum(np.sum(patch, axis=0), axis=0)
 

@@ -1,5 +1,5 @@
 # VU_Bachelor_Project
-Sequence models for the analysis of time-lapse microscopy data
+Sequence models for the analysis of time-lapse microscopy data.
 
 <h1>Dependencies</h1>
 pytorch

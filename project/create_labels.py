@@ -1,6 +1,6 @@
 from scripts_training_data.data_preparation import *
 from scripts_training_data.extract_patches import *
-
+from parameters import *
 from skimage import io
 
 import matplotlib.pyplot as plt
@@ -12,16 +12,8 @@ import time
 import warnings
 warnings.filterwarnings("ignore")
 
-dataset = '20190326'
 
-root_dir = 'D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
-out_dir = '{}/patches/'.format(root_dir)
-
-label_in_path = '{}/segmented_bordered/'.format(root_dir)
-segmented_in_path = '{}/segmented'.format(root_dir)
-
-label_dir = '{}/label/'.format(root_dir)
-raw_dir = '{}/raw/'.format(root_dir)
+paths = get_paths()
 
 
 def make_dirs(path):
@@ -44,7 +36,7 @@ def create_borders(img):
 
 
 def image_to_binary(img):
-	return 1 * (img > 0)
+    return 1 * (img > 0)
 
 
 def get_cell_borders(img):
@@ -66,7 +58,7 @@ def process_segmented_images(path):
         img = io.imread("{}/{}".format(path, file))
         bordered_img = create_borders(img)
 
-        io.imsave("{}/{}".format(label_in_path, file), bordered_img)
+        io.imsave("{}/{}".format(paths['label_in_path'], file), bordered_img)
 
 
 def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_classes=None):
@@ -88,24 +80,9 @@ def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_
         io.imsave('{}/{}'.format(out_path, f), img_out.astype(np.uint8))
 
 
-
-
-    # for f in files[0:1]:   #TODO remove slice
-    #     img = io.imread('{}/{}'.format(prediction_path, f))
-    #     img_argmax = np.argmax(img, axis=0)
-
-    #     if number_of_classes is None:
-    #         noc = np.max(img_argmax) + 1
-    #     else:
-    #         noc = number_of_classes
-
-    #     img_out = np.eye(noc)[img_argmax]
-    #     io.imsave('{}/{}'.format(out_path, f), img_out.astype(np.uint8))
-
-
-
-#process_segmented_images(segmented_in_path)
-classification_to_one_hot_ground_truth(label_in_path, label_dir, number_of_classes = None)
+if __name__ == '__main__':
+    process_segmented_images(paths['segmented_in_path'])
+    classification_to_one_hot_ground_truth(paths['label_in_path'], paths['label_dir'], number_of_classes = None)
 
 
 
