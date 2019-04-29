@@ -30,7 +30,7 @@ def create_borders(img):
     binary_image = image_to_binary(img)
     borders = get_cell_borders(binary_image)
 
-    result_image = binary_image + 2 * borders
+    result_image = binary_image + 3 * borders
 
     return result_image
 
@@ -68,7 +68,7 @@ def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_
 
     for f in files:
         img = io.imread('{}/{}'.format(prediction_path, f))
-        img =img.astype(np.int32)
+        img = img.astype(np.int32)
 
         if number_of_classes is None:
             noc = np.max(img) + 1
@@ -82,7 +82,7 @@ def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_
 
 if __name__ == '__main__':
     process_segmented_images(paths['segmented_in_path'])
-    classification_to_one_hot_ground_truth(paths['label_in_path'], paths['label_dir'], number_of_classes = None)
+    classification_to_one_hot_ground_truth(paths['label_in_path'], paths['label_dir'], number_of_classes = 5)
 
 
 

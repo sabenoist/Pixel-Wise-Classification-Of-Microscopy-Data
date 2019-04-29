@@ -19,11 +19,11 @@ def make_weightmap(tup):
 	wmap = wmap.astype(np.float32)
 	wmap /= (freqs + 1)#[:,None]  # +1 to avoid zero division
 
-	# wmap[:,:,3] *= 2 # emphasise borders
-	wmap[:,:,2] *= 2 # borders is at index 2 now.
+	wmap[:,:,3] *= 2 # emphasise borders
+	# wmap[:,:,2] *= 2 # borders is at index 2 now.
 
 	wmap = .1 + np.sum(wmap, axis=np.argmin(img.shape)) * np.sum(ndi.filters.gaussian_filter(wmap, sigma), axis=np.argmin(img.shape))
-	# wmap[img[:,:,4]>0] = 0  TODO: uncomment
+	wmap[img[:,:,4]>0] = 0
 
 	io.imsave(out_path, wmap)
 
