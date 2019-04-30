@@ -8,7 +8,6 @@ import os
 from parameters import *
 
 
-
 class UNet(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(UNet, self).__init__()
@@ -109,14 +108,16 @@ class UNet(nn.Module):
         return  final_layer
 
 
-def train_UNet(unet, inputs, width_out, height_out, epochs=1):
+# TODO: implement weight_mapping for the learning_rate
+def train_UNet(unet, training_data, labels, weight_maps, width_out, height_out, epochs=1):
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(unet.parameters(), lr = 0.01, momentum=0.99)
+    optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()
 
     for epoch in range(epochs):
-        for input in inputs:
-            output = unet(input)
+        for i in range(training_data):
+            raw_image = training_data[i]
+            output = unet(raw_image)
 
             # permute such that number of desired segments would be on 4th dimension
             output = output.permute(0, 2, 3, 1)
@@ -124,9 +125,9 @@ def train_UNet(unet, inputs, width_out, height_out, epochs=1):
 
             # Resizing the outputs and label to calculate pixel wise softmax loss
             output = output.resize(m * width_out * height_out, 2)
-            labels = labels.resize(m * width_out * height_out)
+            label = labels[i].resize(m * width_out * height_out)
 
-            loss = criterion(output, labels)
+            loss = criterion(output, label)
             loss.backward()
             optimizer.step()
 
@@ -134,8 +135,9 @@ def train_UNet(unet, inputs, width_out, height_out, epochs=1):
 def select_device():
     if torch.cuda.is_available():
         try:
-            gpu_test = torch.empty(5, 5)
+            gpu_test = torch.empty(164, 164)
             gpu_test.to(torch.device('cuda'))
+            del gpu_test
 
             return torch.device('cuda')  # GPU
         except:
@@ -150,9 +152,12 @@ def select_device():
 
 if __name__ == '__main__':
     paths = get_paths()
-    training_data = [img for img in os.listdir(paths['label_dir']) if img.endswith('.tif')]
+
+    training_data = [img for img in os.listdir('{}/raw'.format(paths['out_dir'])) if img.endswith('.tif')]
+    labels = [img for img in os.listdir('{}/label'.format(paths['out_dir'])) if img.endswith('.tif')]
+    weight_maps = [img for img in os.listdir('{}/wmap'.format(paths['out_dir'])) if img.endswith('.tif')]
 
     unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
     unet.to(device=select_device())
 
-    train_UNet(unet, training_data, 164, 164, 1)
+    train_UNet(unet, training_data, labels, weight_maps, 164, 164, 1)
