@@ -2,6 +2,7 @@ import torch
 
 from parameters import *
 from PatchDataset import PatchDataset
+from torch.utils.data import DataLoader
 
 
 def select_device():
@@ -13,7 +14,7 @@ def select_device():
 
             return torch.device('cuda')  # GPU
         except:
-            print('Warning: GPU too old or CUDA is broken. Using CPU instead.')
+            print('Warning: CUDA is broken. Using CPU instead.')
 
             return torch.device('cpu')  # CPU
     else:
@@ -30,3 +31,7 @@ if __name__ == '__main__':
 
     print(len(patches))
     print(patches[0])
+
+    dataloader = DataLoader(patches, batch_size=4, shuffle=True, num_workers=4)
+
+    

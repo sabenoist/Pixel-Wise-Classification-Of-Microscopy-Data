@@ -2,10 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import matplotlib.pyplot as plt
-import os
-
-from parameters import *
 
 
 class UNet(nn.Module):
@@ -135,12 +131,6 @@ def train_UNet(unet, training_data, labels, weight_maps, width_out, height_out, 
 
 #
 # if __name__ == '__main__':
-#     paths = get_paths()
-#
-#     # training_data = [img for img in os.listdir('{}/raw'.format(paths['out_dir'])) if img.endswith('.tif')]
-#     # labels = [img for img in os.listdir('{}/label'.format(paths['out_dir'])) if img.endswith('.tif')]
-#     # weight_maps = [img for img in os.listdir('{}/wmap'.format(paths['out_dir'])) if img.endswith('.tif')]
-#
 #     unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
 #     unet.to(device=select_device())
 #
