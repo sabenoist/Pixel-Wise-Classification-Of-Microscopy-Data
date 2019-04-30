@@ -43,7 +43,7 @@ def get_patch_parameters():
         'label_dir': paths['label_dir'],
         'raw_dir': paths['raw_dir'],
         'img_type': np.float32,
-        'label_class': 2,
+        'label_class': 3,   # 0=bg, 1=cells, 2=buds, 3=borders, 4=noise
         'min_pixels': 200,
         'out_path_raw': '{}/raw/'.format(paths['out_dir']),
         'out_path_label': '{}/label/'.format(paths['out_dir']),
