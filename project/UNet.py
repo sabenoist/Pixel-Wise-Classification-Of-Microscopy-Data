@@ -139,7 +139,7 @@ def select_device():
 
             return torch.device('cuda')  # GPU
         except:
-            print('Warning: GPU too old to be used. Using CPU instead.')
+            print('Warning: GPU too old to be used or CUDA is corrupt. Using CPU instead.')
 
             return torch.device('cpu')  # CPU
     else:
@@ -153,6 +153,6 @@ if __name__ == '__main__':
     training_data = [img for img in os.listdir(paths['label_dir']) if img.endswith('.tif')]
 
     unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
-
+    unet.to(device=select_device())
 
     train_UNet(unet, training_data, 164, 164, 1)
