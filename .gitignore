@@ -3,6 +3,9 @@
 *.xml
 *.tif
 *.txt
+*.jpg
+*.csv
+examples/data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

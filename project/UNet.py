@@ -132,32 +132,16 @@ def train_UNet(unet, training_data, labels, weight_maps, width_out, height_out, 
             optimizer.step()
 
 
-def select_device():
-    if torch.cuda.is_available():
-        try:
-            gpu_test = torch.empty(164, 164)
-            gpu_test.to(torch.device('cuda'))
-            del gpu_test
 
-            return torch.device('cuda')  # GPU
-        except:
-            print('Warning: GPU too old to be used or CUDA is corrupt. Using CPU instead.')
-
-            return torch.device('cpu')  # CPU
-    else:
-        print('Warning: Incompatible GPU found. Using CPU instead.')
-
-        return torch.device('cpu')  # CPU
-
-
-if __name__ == '__main__':
-    paths = get_paths()
-
-    training_data = [img for img in os.listdir('{}/raw'.format(paths['out_dir'])) if img.endswith('.tif')]
-    labels = [img for img in os.listdir('{}/label'.format(paths['out_dir'])) if img.endswith('.tif')]
-    weight_maps = [img for img in os.listdir('{}/wmap'.format(paths['out_dir'])) if img.endswith('.tif')]
-
-    unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
-    unet.to(device=select_device())
-
-    train_UNet(unet, training_data, labels, weight_maps, 164, 164, 1)
+#
+# if __name__ == '__main__':
+#     paths = get_paths()
+#
+#     # training_data = [img for img in os.listdir('{}/raw'.format(paths['out_dir'])) if img.endswith('.tif')]
+#     # labels = [img for img in os.listdir('{}/label'.format(paths['out_dir'])) if img.endswith('.tif')]
+#     # weight_maps = [img for img in os.listdir('{}/wmap'.format(paths['out_dir'])) if img.endswith('.tif')]
+#
+#     unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
+#     unet.to(device=select_device())
+#
+#     # train_UNet(unet, training_data, labels, weight_maps, 164, 164, 1)
