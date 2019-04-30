@@ -7,7 +7,7 @@ import os
 import time
 
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 
 paths = get_paths()

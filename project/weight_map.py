@@ -6,7 +6,7 @@ from multiprocessing import Pool
 
 
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 
 paths = get_paths()

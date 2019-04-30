@@ -10,7 +10,7 @@ import numpy as np
 import time
 
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 
 paths = get_paths()
@@ -55,10 +55,10 @@ def process_segmented_images(path):
     files = [a for a in os.listdir(path) if a.endswith('.tif')]
 
     for file in files:
-        img = io.imread("{}/{}".format(path, file))
+        img = io.imread('{}/{}'.format(path, file))
         bordered_img = create_borders(img)
 
-        io.imsave("{}/{}".format(paths['label_in_path'], file), bordered_img)
+        io.imsave('{}/{}'.format(paths['label_in_path'], file), bordered_img)
 
 
 def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_classes=None):

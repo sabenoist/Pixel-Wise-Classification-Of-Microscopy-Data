@@ -2,12 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
 import matplotlib.pyplot as plt
+import os
 
-import numpy as np
+from parameters import *
 
-import time
 
 
 class UNet(nn.Module):
@@ -132,7 +131,28 @@ def train_UNet(unet, inputs, width_out, height_out, epochs=1):
             optimizer.step()
 
 
-inputs = []
+def select_device():
+    if torch.cuda.is_available():
+        try:
+            gpu_test = torch.empty(5, 5)
+            gpu_test.to(torch.device('cuda'))
 
-unet = UNet(in_channel=5, out_channel=2) #out_channel represents number of segments desired
+            return torch.device('cuda')  # GPU
+        except:
+            print('Warning: GPU too old to be used. Using CPU instead.')
 
+            return torch.device('cpu')  # CPU
+    else:
+        print('Warning: Incompatible GPU found. Using CPU instead.')
+
+        return torch.device('cpu')  # CPU
+
+
+if __name__ == '__main__':
+    paths = get_paths()
+    training_data = [img for img in os.listdir(paths['label_dir']) if img.endswith('.tif')]
+
+    unet = UNet(in_channel=5, out_channel=2)  # out_channel represents number of segments desired
+
+
+    train_UNet(unet, training_data, 164, 164, 1)
