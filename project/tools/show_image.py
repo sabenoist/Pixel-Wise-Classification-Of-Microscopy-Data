@@ -12,11 +12,16 @@ import skimage.io as io
 # img = io.imread('D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/20190326/patches/wmap/patch_000158.tif')
 # img = io.imread('D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/20190326/patches/wmap/patch_000227.tif')
 img = io.imread('D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/20190326/patches/wmap/patch_000266.tif')
+img_raw = io.imread('D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/20190326/patches/raw/patch_000266.tif')
 
 
 print(img.shape)
 
+plt.subplot(1, 2, 1)
 plt.imshow(img)
+
+plt.subplot(1, 2, 2)
+plt.imshow(img_raw)
 plt.show()
 
 

@@ -33,7 +33,7 @@ def calc_dataset_stats():
 
 if __name__ == '__main__':
     classcounts = extract_classes()
-    # classcounts = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
+
     calc_dataset_stats()
 
     make_dirs(patch_augmentation_parameters['out_path_wmap'])

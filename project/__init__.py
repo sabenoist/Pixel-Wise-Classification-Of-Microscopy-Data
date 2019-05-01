@@ -34,4 +34,3 @@ if __name__ == '__main__':
 
     dataloader = DataLoader(patches, batch_size=4, shuffle=True, num_workers=4)
 
-    
