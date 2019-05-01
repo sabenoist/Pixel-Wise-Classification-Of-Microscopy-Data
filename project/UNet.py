@@ -80,9 +80,9 @@ class UNet(nn.Module):
         return torch.cat((upsampled, bypass), 1)
 
 
-    def forward(self, x):
+    def forward(self, input_img):
         # Encode
-        encode_block1 = self.conv_encode1(x)
+        encode_block1 = self.conv_encode1(input_img)
         encode_pool1 = self.conv_maxpool1(encode_block1)
         encode_block2 = self.conv_encode2(encode_pool1)
         encode_pool2 = self.conv_maxpool2(encode_block2)
@@ -105,7 +105,7 @@ class UNet(nn.Module):
 
 
 # TODO: implement weight_mapping for the learning_rate
-def train_UNet(unet, training_data, labels, weight_maps, width_out, height_out, epochs=1):
+def train_UNet(unet, dataset, width_out, height_out, epochs=1):
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()

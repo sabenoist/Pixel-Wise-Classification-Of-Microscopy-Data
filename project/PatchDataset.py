@@ -21,10 +21,10 @@ class PatchDataset(Dataset):
         patch_name = self.file_names[idx]
 
         raw = torch.from_numpy(io.imread('{}/{}'.format(self.raw_path, patch_name)))
-        raw.to(self.device)
+        raw = raw.to(self.device)
 
         label = torch.from_numpy(io.imread('{}/{}'.format(self.label_path, patch_name)))
-        label.to(self.device)
+        label = label.to(self.device)
 
         sample = {'patch_name': patch_name, 'raw': raw, 'label': label}
 
