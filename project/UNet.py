@@ -113,12 +113,13 @@ class UNet(nn.Module):
         # Encode
         encode_block1 = self.conv_encode1(input_img)
         encode_pool1 = self.conv_maxpool1(encode_block1)
-        print(self.conv_encode1[0].weight.shape)
 
         encode_block2 = self.conv_encode2(encode_pool1)
         encode_pool2 = self.conv_maxpool2(encode_block2)
+
         encode_block3 = self.conv_encode3(encode_pool2)
         encode_pool3 = self.conv_maxpool3(encode_block3)
+
         encode_block4 = self.conv_encode4(encode_pool3)
         encode_pool4 = self.conv_maxpool4(encode_block4)
 
@@ -147,35 +148,32 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()
 
-    loader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
+    batch_size = 4
+    patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     for epoch in range(epochs):
-        # for batch_ndx, sample in enumerate(loader):
-        #     print(batch_ndx, sample['patch_name'])
-        #
-        #     raw = sample['raw']
-        #     label = sample['label']
-        #
+        temp_count = 0
 
-        for i in range(1):#(len(dataset)):  # TODO: remove slice
-            print(dataset[i]['patch_name'])
+        for batch_ndx, sample in enumerate(patch_loader):
+            for i in range(batch_size):
+                # Forward part
+                patch_name = sample['patch_name'][i]
+                raw = sample['raw'][i]
+                label = sample['label'][i]
 
-            raw = dataset[i]['raw']
-            labels = dataset[i]['label']
+                print(patch_name)
 
-            outputs = unet(raw[None][None])  # None will add the missing dimensions at the front
-
-            print('\nraw.shape: {}\n'.format(raw.shape))
-            print('outputs.shape: {}'.format(outputs.shape))
-            print('outputs.shape[0]: {}\n'.format(outputs[0].shape))
-
-            plot_tensors(raw, outputs)
-
-            # permute such that number of desired segments would be on 4th dimension
-            outputs = outputs.permute(0, 2, 3, 1)
-            m = outputs.shape[0]
+                model = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
 
+            temp_count += 1
+            if temp_count >= 1:
+                break
+
+
+            #     # permute such that number of desired segments would be on 4th dimension
+            #     outputs = outputs.permute(0, 2, 3, 1)
+            #     m = outputs.shape[0]
 
             # Resizing the outputs and label to caculate pixel wise softmax loss
             # outputs = outputs.resize(m * width_out * height_out, 2)
@@ -188,8 +186,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 def plot_tensors(raw, output):
     raw = raw.numpy()
     output = output.detach().numpy()  # detaches grad from variable
-
-    print(output.shape)
 
     plt.subplot(2, 3, 1)
     plt.imshow(raw)
