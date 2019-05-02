@@ -16,7 +16,6 @@ layer1_size = 64
 layer2_size = 128
 layer3_size = 256
 layer4_size = 512
-layer5_size = 1024
 
 
 class UNet(nn.Module):
@@ -33,22 +32,18 @@ class UNet(nn.Module):
         self.conv_encode3 = self.contracting_block(in_channels=layer2_size, out_channels=layer3_size)
         self.conv_maxpool3 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv_encode4 = self.contracting_block(in_channels=layer3_size, out_channels=layer4_size)
-        self.conv_maxpool4 = nn.MaxPool2d(kernel_size=2)
-
         # Bottleneck
-        self.bottleneck = nn.Sequential(nn.Conv2d(kernel_size=3, in_channels=layer4_size, out_channels=layer5_size),
+        self.bottleneck = nn.Sequential(nn.Conv2d(kernel_size=3, in_channels=layer3_size, out_channels=layer4_size),
                             nn.ReLU(),
-                            nn.BatchNorm2d(layer5_size),
-                            nn.Conv2d(kernel_size=3, in_channels=layer5_size, out_channels=layer5_size),
+                            nn.BatchNorm2d(layer4_size),
+                            nn.Conv2d(kernel_size=3, in_channels=layer4_size, out_channels=layer4_size),
                             nn.ReLU(),
-                            nn.BatchNorm2d(layer5_size),
-                            nn.ConvTranspose2d(in_channels=layer5_size, out_channels=layer4_size, kernel_size=3, stride=2,
+                            nn.BatchNorm2d(layer4_size),
+                            nn.ConvTranspose2d(in_channels=layer4_size, out_channels=layer3_size, kernel_size=3, stride=2,
                                                padding=1, output_padding=1)
                                               )
 
         # Upwards decoding part
-        self.conv_decode4 = self.expansive_block(layer5_size, layer4_size, layer3_size)
         self.conv_decode3 = self.expansive_block(layer4_size, layer3_size, layer2_size)
         self.conv_decode2 = self.expansive_block(layer3_size, layer2_size, layer1_size)
         self.final_layer = self.final_block(layer2_size, layer1_size, out_channel)
@@ -113,21 +108,21 @@ class UNet(nn.Module):
         # Encode
         encode_block1 = self.conv_encode1(input_img)
         encode_pool1 = self.conv_maxpool1(encode_block1)
+        print(self.conv_encode1[0].weight.shape)
+
         encode_block2 = self.conv_encode2(encode_pool1)
         encode_pool2 = self.conv_maxpool2(encode_block2)
+
         encode_block3 = self.conv_encode3(encode_pool2)
         encode_pool3 = self.conv_maxpool3(encode_block3)
-        encode_block4 = self.conv_encode4(encode_pool3)
-        encode_pool4 = self.conv_maxpool4(encode_block4)
 
         # Bottleneck
-        bottleneck1 = self.bottleneck(encode_pool4)
+        bottleneck1 = self.bottleneck(encode_pool3)
 
         # Decode
-        decode_block4 = self.crop_and_concat(bottleneck1, encode_block4, crop=True)
-        cat_layer3 = self.conv_decode4(decode_block4)
-        decode_block3 = self.crop_and_concat(cat_layer3, encode_block3, crop=True)
+        decode_block3 = self.crop_and_concat(bottleneck1, encode_block3, crop=True)
         cat_layer2 = self.conv_decode3(decode_block3)
+
         decode_block2 = self.crop_and_concat(cat_layer2, encode_block2, crop=True)
         cat_layer1 = self.conv_decode2(decode_block2)
 
@@ -161,9 +156,9 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 
             outputs = unet(raw[None][None])  # None will add the missing dimensions at the front
 
-            print('\nraw.shape: {}\n'.format(raw.shape))
-            print('outputs.shape: {}'.format(outputs.shape))
-            print('outputs.shape[0]: {}\n'.format(outputs[0].shape))
+            # print('\nraw.shape: {}\n'.format(raw.shape))
+            # print('outputs.shape: {}'.format(outputs.shape))
+            # print('outputs.shape[0]: {}\n'.format(outputs[0].shape))
 
             plot_tensors(raw, outputs)
 
@@ -184,8 +179,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 def plot_tensors(raw, output):
     raw = raw.numpy()
     output = output.detach().numpy()  # detaches grad from variable
-
-    print(output.shape)
 
     plt.subplot(2, 3, 1)
     plt.imshow(raw)
