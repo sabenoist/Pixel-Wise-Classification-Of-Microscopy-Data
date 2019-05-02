@@ -10,39 +10,48 @@ from parameters import get_paths
 from PatchDataset import PatchDataset
 from torch.utils.data import DataLoader
 
+
+# UNet layer sizes
+layer1_size = 64
+layer2_size = 128
+layer3_size = 256
+layer4_size = 512
+layer5_size = 1024
+
+
 class UNet(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(UNet, self).__init__()
 
         # Downwards encoding part
-        self.conv_encode1 = self.contracting_block(in_channels=in_channel, out_channels=64)
+        self.conv_encode1 = self.contracting_block(in_channels=in_channel, out_channels=layer1_size)
         self.conv_maxpool1 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv_encode2 = self.contracting_block(in_channels=64, out_channels=128)
+        self.conv_encode2 = self.contracting_block(in_channels=layer1_size, out_channels=layer2_size)
         self.conv_maxpool2 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv_encode3 = self.contracting_block(in_channels=128, out_channels=256)
+        self.conv_encode3 = self.contracting_block(in_channels=layer2_size, out_channels=layer3_size)
         self.conv_maxpool3 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv_encode4 = self.contracting_block(in_channels=256, out_channels=512)
+        self.conv_encode4 = self.contracting_block(in_channels=layer3_size, out_channels=layer4_size)
         self.conv_maxpool4 = nn.MaxPool2d(kernel_size=2)
 
         # Bottleneck
-        self.bottleneck = nn.Sequential(nn.Conv2d(kernel_size=3, in_channels=512, out_channels=1024),
+        self.bottleneck = nn.Sequential(nn.Conv2d(kernel_size=3, in_channels=layer4_size, out_channels=layer5_size),
                             nn.ReLU(),
-                            nn.BatchNorm2d(1024),
-                            nn.Conv2d(kernel_size=3, in_channels=1024, out_channels=1024),
+                            nn.BatchNorm2d(layer5_size),
+                            nn.Conv2d(kernel_size=3, in_channels=layer5_size, out_channels=layer5_size),
                             nn.ReLU(),
-                            nn.BatchNorm2d(1024),
-                            nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=3, stride=2,
+                            nn.BatchNorm2d(layer5_size),
+                            nn.ConvTranspose2d(in_channels=layer5_size, out_channels=layer4_size, kernel_size=3, stride=2,
                                                padding=1, output_padding=1)
                                               )
 
         # Upwards decoding part
-        self.conv_decode4 = self.expansive_block(1024, 512, 256)
-        self.conv_decode3 = self.expansive_block(512, 256, 128)
-        self.conv_decode2 = self.expansive_block(256, 128, 64)
-        self.final_layer = self.final_block(128, 64, out_channel)
+        self.conv_decode4 = self.expansive_block(layer5_size, layer4_size, layer3_size)
+        self.conv_decode3 = self.expansive_block(layer4_size, layer3_size, layer2_size)
+        self.conv_decode2 = self.expansive_block(layer3_size, layer2_size, layer1_size)
+        self.final_layer = self.final_block(layer2_size, layer1_size, out_channel)
 
 
     def contracting_block(self, in_channels, out_channels, kernel_size=3):
@@ -176,11 +185,25 @@ def plot_tensors(raw, output):
     raw = raw.numpy()
     output = output.detach().numpy()  # detaches grad from variable
 
-    plt.subplot(1, 2, 1)
+    print(output.shape)
+
+    plt.subplot(2, 3, 1)
     plt.imshow(raw)
 
-    plt.subplot(1, 2, 2)
-    plt.imshow(output[0,0,:,:])
+    plt.subplot(2, 3, 2)
+    plt.imshow(output[0, 0, :, :])
+
+    plt.subplot(2, 3, 3)
+    plt.imshow(output[0, 1, :, :])
+
+    plt.subplot(2, 3, 4)
+    plt.imshow(output[0, 2, :, :])
+
+    plt.subplot(2, 3, 5)
+    plt.imshow(output[0, 3, :, :])
+
+    plt.subplot(2, 3, 6)
+    plt.imshow(output[0, 4, :, :])
 
     plt.show()
 
@@ -188,10 +211,10 @@ def plot_tensors(raw, output):
 if __name__ == '__main__':
     device = select_device(force_cpu=True)
 
-    unet = UNet(in_channel=1, out_channel=2)  # out_channel represents number of segments desired
+    unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
 
     paths = get_paths()
     patches = PatchDataset(paths['out_dir'], device)
 
-    train_UNet(device, unet, patches, 164, 164, 1)
+    train_UNet(device, unet, patches, 348, 348, 1)
