@@ -1,4 +1,5 @@
 # Data files
+*.torrent
 *.iml
 *.xml
 *.tif
