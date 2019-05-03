@@ -154,8 +154,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     for epoch in range(epochs):
-        temp_count = 0  # TODO: remove
-
         for batch_ndx, sample in enumerate(patch_loader):
             for i in range(batch_size):
                 # Forward part
@@ -178,11 +176,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
                 loss.backward()
                 optimizer.step()
-
-            # TODO: remove
-            temp_count += 1
-            if temp_count >= 1:
-                break
 
     save_model(unet, 'D:/Bachelor_Project/VU_Bachelor_Project/project/models/', 'test1.pickle')
 
