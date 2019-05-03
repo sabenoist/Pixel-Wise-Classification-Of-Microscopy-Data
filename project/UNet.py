@@ -10,6 +10,8 @@ from parameters import get_paths
 from PatchDataset import PatchDataset
 from torch.utils.data import DataLoader
 
+import warnings
+warnings.filterwarnings('ignore')
 
 # UNet layer sizes
 layer1_size = 64
@@ -152,7 +154,7 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     for epoch in range(epochs):
-        temp_count = 0
+        temp_count = 0  # TODO: remove
 
         for batch_ndx, sample in enumerate(patch_loader):
             for i in range(batch_size):
@@ -165,22 +167,22 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 
                 model = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
+                # Backwards part
+                model = model.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+                m = model.shape[0]
 
-            temp_count += 1
-            if temp_count >= 1:
-                break
+                # Resizing the outputs and label to calculate pixel wise softmax loss
+                model = model.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
+                label = label.resize(m * width_out * height_out, 5)  # was nothing
 
+                loss = criterion(model, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
+                loss.backward()
+                optimizer.step()
 
-            #     # permute such that number of desired segments would be on 4th dimension
-            #     outputs = outputs.permute(0, 2, 3, 1)
-            #     m = outputs.shape[0]
-
-            # Resizing the outputs and label to caculate pixel wise softmax loss
-            # outputs = outputs.resize(m * width_out * height_out, 2)
-            # labels = labels.resize(m * width_out * height_out)
-            # loss = criterion(outputs, labels)
-            # loss.backward()
-            # optimizer.step()
+            # TODO: remove
+            # temp_count += 1
+            # if temp_count >= 1:
+            #     break
 
 
 def plot_tensors(raw, output):
@@ -217,4 +219,4 @@ if __name__ == '__main__':
     paths = get_paths()
     patches = PatchDataset(paths['out_dir'], device)
 
-    train_UNet(device, unet, patches, 348, 348, 1)
+    train_UNet(device, unet, patches, 164, 164, 1)
