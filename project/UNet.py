@@ -1,9 +1,9 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
-import numpy as np
 
 from device import select_device
 from parameters import get_paths
@@ -165,24 +165,33 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 
                 print(patch_name)
 
-                model = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
+                output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
                 # Backwards part
-                model = model.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
-                m = model.shape[0]
+                output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+                m = output.shape[0]
 
                 # Resizing the outputs and label to calculate pixel wise softmax loss
-                model = model.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
+                output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
                 label = label.resize(m * width_out * height_out, 5)  # was nothing
 
-                loss = criterion(model, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
+                loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
                 loss.backward()
                 optimizer.step()
 
             # TODO: remove
-            # temp_count += 1
-            # if temp_count >= 1:
-            #     break
+            temp_count += 1
+            if temp_count >= 1:
+                break
+
+    save_model(unet, 'D:/Bachelor_Project/VU_Bachelor_Project/project/models/', 'test1.pickle')
+
+
+def save_model(unet, path, name):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    torch.save(unet.state_dict(), path + name)
 
 
 def plot_tensors(raw, output):

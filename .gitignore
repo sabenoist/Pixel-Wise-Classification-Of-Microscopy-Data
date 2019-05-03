@@ -1,4 +1,5 @@
 # Data files
+*.pickle
 *.torrent
 *.iml
 *.xml
