@@ -181,11 +181,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 loss.backward()
                 optimizer.step()
 
-
-            # TODO: remove
-            if patch_counter >= 10:
-                break
-
     save_model(unet, paths['model_dir'], 'test2.pickle')
 
 
