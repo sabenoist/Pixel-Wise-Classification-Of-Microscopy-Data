@@ -152,8 +152,11 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 
     batch_size = 4
     patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    patches_amount = len(dataset)
 
     for epoch in range(epochs):
+        patch_counter = 0
+
         for batch_ndx, sample in enumerate(patch_loader):
             for i in range(batch_size):
                 # Forward part
@@ -161,7 +164,8 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 raw = sample['raw'][i]
                 label = sample['label'][i]
 
-                print(patch_name)
+                print('{}. [{}/{}] - {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name))
+                patch_counter += 1
 
                 output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
@@ -177,7 +181,12 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 loss.backward()
                 optimizer.step()
 
-    save_model(unet, 'D:/Bachelor_Project/VU_Bachelor_Project/project/models/', 'test1.pickle')
+
+            # TODO: remove
+            if patch_counter >= 10:
+                break
+
+    save_model(unet, paths['model_dir'], 'test2.pickle')
 
 
 def save_model(unet, path, name):

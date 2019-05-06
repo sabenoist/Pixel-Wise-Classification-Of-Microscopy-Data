@@ -2,8 +2,8 @@ import numpy as np
 
 def get_paths():
     dataset = '20190326'
-
     root_dir = 'D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
+
     out_dir = '{}/patches/'.format(root_dir)
 
     label_in_path = '{}/segmented_bordered/'.format(root_dir)
@@ -12,6 +12,8 @@ def get_paths():
     label_dir = '{}/label/'.format(root_dir)
     raw_dir = '{}/raw/'.format(root_dir)
 
+    model_dir = '{}/models/'.format(root_dir)
+
     paths = {
         'dataset': dataset,
         'root_dir': root_dir,
@@ -19,7 +21,8 @@ def get_paths():
         'label_in_path': label_in_path,
         'segmented_in_path': segmented_in_path,
         'label_dir': label_dir,
-        'raw_dir': raw_dir
+        'raw_dir': raw_dir,
+        'model_dir': model_dir
     }
 
     return paths
