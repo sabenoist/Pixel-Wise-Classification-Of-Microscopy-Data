@@ -151,16 +151,16 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     optimizer.zero_grad()
 
     batch_size = 4
-    patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     patches_amount = len(dataset)
 
     for epoch in range(epochs):
         patch_counter = 0
 
-        for batch_ndx, sample in enumerate(patch_loader):
-            if patch_counter >= 1:
-                break
+        if patch_counter >= 1:
+        	break
 
+        for batch_ndx, sample in enumerate(patch_loader):
             for i in range(batch_size):
                 # Forward part
                 patch_name = sample['patch_name'][i]
@@ -186,7 +186,7 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 loss.backward()
                 optimizer.step()
 
-    save_model(unet, paths['model_dir'], 'test2.pickle')
+    save_model(unet, paths['model_dir'], 'testGPU.pickle')
 
 
 def save_model(unet, path, name):
@@ -222,7 +222,7 @@ def plot_tensors(raw, output):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=True)
+    device = select_device(force_cpu=False)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
