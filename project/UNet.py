@@ -158,6 +158,9 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
         patch_counter = 0
 
         for batch_ndx, sample in enumerate(patch_loader):
+            if patch_counter >= 1:
+                break
+
             for i in range(batch_size):
                 # Forward part
                 patch_name = sample['patch_name'][i]
@@ -177,7 +180,9 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
                 label = label.resize(m * width_out * height_out, 5)  # was nothing
 
-                loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
+                # loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
+                loss = criterion(output, torch.argmax(label, 1))
+
                 loss.backward()
                 optimizer.step()
 
