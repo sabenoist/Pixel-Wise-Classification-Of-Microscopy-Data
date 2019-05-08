@@ -11,6 +11,7 @@ class PatchDataset(Dataset):
 
         self.raw_path = '{}/raw/'.format(root_path)
         self.label_path = '{}/label/'.format(root_path)
+        self.wmap_path = '{}/wmap/'.format(root_path)
 
         self.file_names = [file for file in os.listdir(self.raw_path) if file.endswith('.tif')]
 
@@ -26,6 +27,9 @@ class PatchDataset(Dataset):
         label = torch.from_numpy(io.imread('{}/{}'.format(self.label_path, patch_name)))
         label = label.to(self.device)
 
-        sample = {'patch_name': patch_name, 'raw': raw, 'label': label}
+        wmap = torch.from_numpy(io.imread('{}/{}'.format(self.wmap_path, patch_name)))
+        wmap = wmap.to(self.device)
+
+        sample = {'patch_name': patch_name, 'raw': raw, 'label': label, 'wmap': wmap}
 
         return sample

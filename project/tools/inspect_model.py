@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 
 paths = get_paths()
-path = '{}/test1.pickle'.format(paths['model_dir'])
+path = '{}/testGPU.pickle'.format(paths['model_dir'])
 
 
 def torch_summarize(model, show_weights=True, show_parameters=True):
@@ -97,9 +97,11 @@ patches = PatchDataset(paths['out_dir'], torch.device('cpu'))
 # plot_2d_tensors(patches[0]['raw'], predicted)
 
 with torch.no_grad():
-    for i in range(5):
+    for i in range(1):
         output = model(patches[i]['raw'][None][None])
         plot_5L_tensors(patches[i]['raw'], output)
+
+        print(output.shape)
 
         # predicted, _ = torch.max(output, 1)
         # plot_2d_tensors(patches[i]['raw'], predicted)

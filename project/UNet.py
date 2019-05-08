@@ -157,15 +157,13 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     for epoch in range(epochs):
         patch_counter = 0
 
-        if patch_counter >= 1:
-        	break
-
         for batch_ndx, sample in enumerate(patch_loader):
             for i in range(batch_size):
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = sample['raw'][i]
                 label = sample['label'][i]
+                wmap = sample['wmap'][i]
 
                 print('{}. [{}/{}] - {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name))
                 patch_counter += 1
@@ -181,7 +179,7 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 label = label.resize(m * width_out * height_out, 5)  # was nothing
 
                 # loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
-                loss = criterion(output, torch.argmax(label, 1))
+                loss = criterion(output, torch.argmax(label, 1), weight=wmap)
 
                 loss.backward()
                 optimizer.step()
@@ -194,31 +192,6 @@ def save_model(unet, path, name):
         os.makedirs(path)
 
     torch.save(unet.state_dict(), path + name)
-
-
-def plot_tensors(raw, output):
-    raw = raw.numpy()
-    output = output.detach().numpy()  # detaches grad from variable
-
-    plt.subplot(2, 3, 1)
-    plt.imshow(raw)
-
-    plt.subplot(2, 3, 2)
-    plt.imshow(output[0, 0, :, :])
-
-    plt.subplot(2, 3, 3)
-    plt.imshow(output[0, 1, :, :])
-
-    plt.subplot(2, 3, 4)
-    plt.imshow(output[0, 2, :, :])
-
-    plt.subplot(2, 3, 5)
-    plt.imshow(output[0, 3, :, :])
-
-    plt.subplot(2, 3, 6)
-    plt.imshow(output[0, 4, :, :])
-
-    plt.show()
 
 
 if __name__ == '__main__':
