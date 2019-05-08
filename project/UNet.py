@@ -154,10 +154,15 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     patches_amount = len(dataset)
 
+    loss_info = list()
+
     for epoch in range(epochs):
         patch_counter = 0
 
         for batch_ndx, sample in enumerate(patch_loader):
+            if patch_counter >= 1:
+                break
+
             for i in range(batch_size):
                 # Forward part
                 patch_name = sample['patch_name'][i]
@@ -166,7 +171,6 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 wmap = sample['wmap'][i]
 
                 print('{}. [{}/{}] - {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name))
-                patch_counter += 1
 
                 output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
@@ -179,12 +183,19 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 label = label.resize(m * width_out * height_out, 5)  # was nothing
 
                 # loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
-                loss = criterion(output, torch.argmax(label, 1), weight=wmap)
+                loss = criterion(output, torch.argmax(label, 1))
+
+                if patch_counter % 100 == 0:
+                    loss_info.append([epoch, patch_counter, loss.item()])
 
                 loss.backward()
                 optimizer.step()
 
-    save_model(unet, paths['model_dir'], 'testGPU.pickle')
+                patch_counter += 1
+
+    model_name = 'test_loss_info'
+    # save_model(unet, paths['model_dir'], model_name + '.pickle')
+    save_loss_info(loss_info, paths['model_dir'], model_name + '.txt')
 
 
 def save_model(unet, path, name):
@@ -194,8 +205,21 @@ def save_model(unet, path, name):
     torch.save(unet.state_dict(), path + name)
 
 
+def save_loss_info(loss_info, path, name):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    file = open(path + name, 'w+')
+
+    for info in loss_info:
+        file.write('{}  {}  {}'.format(info[0], info[1], info[2]))
+
+    file.close()
+
+
+
 if __name__ == '__main__':
-    device = select_device(force_cpu=False)
+    device = select_device(force_cpu=True)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
