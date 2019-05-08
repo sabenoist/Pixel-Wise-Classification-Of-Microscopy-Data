@@ -150,18 +150,17 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()
 
-    batch_size = 4
-    patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    patches_amount = len(dataset)
-
     loss_info = list()
 
     for epoch in range(epochs):
-        patch_counter = 0
+        batch_size = 20
+        patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
+        patches_amount = len(dataset)
+        patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
-            if patch_counter >= 1:
-                break
+            # if patch_counter >= 1:
+            #     break
 
             for i in range(batch_size):
                 # Forward part
@@ -194,7 +193,7 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
                 patch_counter += 1
 
     model_name = 'test_loss_info'
-    # save_model(unet, paths['model_dir'], model_name + '.pickle')
+    save_model(unet, paths['model_dir'], model_name + '.pickle')
     save_loss_info(loss_info, paths['model_dir'], model_name + '.txt')
 
 
@@ -212,10 +211,9 @@ def save_loss_info(loss_info, path, name):
     file = open(path + name, 'w+')
 
     for info in loss_info:
-        file.write('{}  {}  {}'.format(info[0], info[1], info[2]))
+        file.write('{}  {}  {}\n'.format(info[0], info[1], info[2]))
 
     file.close()
-
 
 
 if __name__ == '__main__':
