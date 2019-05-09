@@ -8,6 +8,7 @@ from device import select_device
 from parameters import get_paths
 from PatchDataset import PatchDataset
 from ValidationSet import ValidationSet
+from WeightedCrossEntropyLoss import WeightedCrossEntropyLoss
 from torch.utils.data import DataLoader
 
 import warnings
@@ -145,7 +146,8 @@ class UNet(nn.Module):
 
 
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = WeightedCrossEntropyLoss().to(device)
+    # criterion = nn.CrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()
@@ -181,9 +183,10 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 # Resizing the outputs and label to calculate pixel wise softmax loss
                 output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
                 label = label.resize(m * width_out * height_out, 5)  # was nothing
+                wmap = wmap.resize(m * width_out * height_out, 1)
 
-                # loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
-                loss = criterion(output, torch.argmax(label, 1))
+                # loss = criterion(output, torch.argmax(label, 1))
+                loss = criterion(output, torch.argmax(label, 1), wmap)
                 loss.backward()
 
                 if patch_counter % 100 == 0:

@@ -32,13 +32,13 @@ class WeightedCrossEntropyLoss(_WeightedLoss):
         self.ignore_index = ignore_index
 
 
-    def forward(self, input, target):
-        return F.cross_entropy(input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
+    def forward(self, input, target, wmap):
+        return weighted_cross_entropy(input, target, wmap, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
 
-def weighted_cross_entropy(input, target, weight=None, size_average=None, ignore_index=-100,
+def weighted_cross_entropy(input, target, wmap, weight=None, size_average=None, ignore_index=-100,
                   reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    # type: (Tensor, Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
     r"""This criterion combines `log_softmax` and `nll_loss` in a single
     function.
 
@@ -71,23 +71,17 @@ def weighted_cross_entropy(input, target, weight=None, size_average=None, ignore
             elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
             and :attr:`reduce` are in the process of being deprecated, and in the meantime,
             specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
-
-    Examples::
-
-        >>> input = torch.randn(3, 5, requires_grad=True)
-        >>> target = torch.randint(5, (3,), dtype=torch.int64)
-        >>> loss = F.cross_entropy(input, target)
-        >>> loss.backward()
     """
+
     if size_average is not None or reduce is not None:
         reduction = _Reduction.legacy_get_string(size_average, reduce)
-    return nll_loss(log_softmax(input, 1), target, weight, None, ignore_index, None, reduction)
+    return nll_loss(log_softmax(input, 1), target, wmap, weight, None, ignore_index, None, reduction)
 
 
 @weak_script
-def nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
+def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-100,
              reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    # type: (Tensor, Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
     r"""The negative log likelihood loss.
 
     See :class:`~torch.nn.NLLLoss` for details.
@@ -119,27 +113,22 @@ def nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
             elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
             and :attr:`reduce` are in the process of being deprecated, and in the meantime,
             specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
-
-    Example::
-
-        >>> # input is of size N x C = 3 x 5
-        >>> input = torch.randn(3, 5, requires_grad=True)
-        >>> # each element in target has to have 0 <= value < C
-        >>> target = torch.tensor([1, 0, 4])
-        >>> output = F.nll_loss(F.log_softmax(input), target)
-        >>> output.backward()
     """
+
     if size_average is not None or reduce is not None:
         reduction = _Reduction.legacy_get_string(size_average, reduce)
+
     dim = input.dim()
+
     if dim < 2:
         raise ValueError('Expected 2 or more dimensions (got {})'.format(dim))
 
-    if input.size(0) != target.size(0):
-        raise ValueError('Expected input batch_size ({}) to match target batch_size ({}).'
-                         .format(input.size(0), target.size(0)))
+    if input.size(0) != target.size(0) or input.size(0) != wmap.size(0):
+        raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
+                         .format(input.size(0), target.size(0), wmap.size(0)))
+
     if dim == 2:
-        ret = torch._C._nn.nll_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index)
+        ret = torch._C._nn.nll_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index)     # TODO: Continue from here.
     elif dim == 4:
         ret = torch._C._nn.nll_loss2d(input, target, weight, _Reduction.get_enum(reduction), ignore_index)
     else:
