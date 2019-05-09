@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import matplotlib.pyplot as plt
 
 from device import select_device
 from parameters import get_paths
@@ -234,7 +233,6 @@ def run_validation(device, unet, validation_set, width_out, height_out):
     return sum(losses) / len(losses)
 
 
-
 def save_model(unet, path, name):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -255,7 +253,7 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=False)
+    device = select_device(force_cpu=True)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
