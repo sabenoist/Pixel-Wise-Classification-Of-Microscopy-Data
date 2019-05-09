@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from device import select_device
 from parameters import get_paths
 from PatchDataset import PatchDataset
+from ValidationSet import ValidationSet
 from torch.utils.data import DataLoader
 
 import warnings
@@ -144,16 +145,17 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
     criterion = nn.CrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
     optimizer.zero_grad()
 
     loss_info = list()
+    validation_info = list()
 
     for epoch in range(epochs):
-        batch_size = 20
+        batch_size = 200
         patch_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
         patches_amount = len(dataset)
@@ -183,18 +185,54 @@ def train_UNet(device, unet, dataset, width_out, height_out, epochs=1):
 
                 # loss = criterion(output, torch.max(label, 1)[1])  # CrossEntropyLoss does not expect a one-hot encoded vector as the target, but class indices
                 loss = criterion(output, torch.argmax(label, 1))
+                loss.backward()
 
                 if patch_counter % 100 == 0:
                     loss_info.append([epoch, patch_counter, loss.item()])
-
-                loss.backward()
+                
                 optimizer.step()
+
+                if patch_counter % 1000 == 0:
+                    validation_info.append([epoch, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
 
                 patch_counter += 1
 
     model_name = 'test_loss_info'
     save_model(unet, paths['model_dir'], model_name + '.pickle')
-    save_loss_info(loss_info, paths['model_dir'], model_name + '.txt')
+    save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
+    save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
+
+
+def run_validation(device, unet, validation_set, width_out, height_out):
+    print("running validation test")
+
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    batch_size = 200
+    patch_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    losses = list()
+
+    for batch_ndx, sample in enumerate(patch_loader):
+        for i in range(batch_size):
+            raw = sample['raw'][i]
+            label = sample['label'][i]
+
+            output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
+
+            output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+            m = output.shape[0]
+
+            # Resizing the outputs and label to calculate pixel wise softmax loss
+            output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
+            label = label.resize(m * width_out * height_out, 5)  # was nothing
+
+            loss = criterion(output, torch.argmax(label, 1))
+
+            losses.append(loss.item())
+
+    return sum(losses) / len(losses)
+
 
 
 def save_model(unet, path, name):
@@ -217,7 +255,7 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=True)
+    device = select_device(force_cpu=False)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
@@ -225,4 +263,6 @@ if __name__ == '__main__':
     paths = get_paths()
     patches = PatchDataset(paths['out_dir'], device)
 
-    train_UNet(device, unet, patches, 164, 164, 1)
+    validation_set = ValidationSet(paths['val_dir'], device)
+
+    train_UNet(device, unet, patches, validation_set, width_out=164, height_out=164)
