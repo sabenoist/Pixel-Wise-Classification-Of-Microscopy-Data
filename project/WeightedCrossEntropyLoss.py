@@ -1,10 +1,12 @@
 from torch.nn.modules import Module
-from torch._jit_internal import weak_module
+from torch._jit_internal import weak_module, weak_script
 
 import torch
 import torch.nn.functional as F
 import torch.nn._reduction as _Reduction
+import warnings
 
+'''This file contains modified source-code from PyTorch that was adjusted to also work with our weight maps'''
 
 class _Loss(Module):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
@@ -23,54 +25,42 @@ class _WeightedLoss(_Loss):
 
 @weak_module
 class WeightedCrossEntropyLoss(_WeightedLoss):
-    r"""This criterion combines :func:`nn.LogSoftmax` and :func:`nn.NLLLoss` in one single class.
+    __constants__ = ['weight', 'ignore_index', 'reduction']
 
-    It is useful when training a classification problem with `C` classes.
-    If provided, the optional argument :attr:`weight` should be a 1D `Tensor`
-    assigning weight to each of the classes.
-    This is particularly useful when you have an unbalanced training set.
+    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
+        super(WeightedCrossEntropyLoss, self).__init__(weight, size_average, reduce, reduction)
+        self.ignore_index = ignore_index
 
-    The `input` is expected to contain raw, unnormalized scores for each class.
 
-    `input` has to be a Tensor of size either :math:`(minibatch, C)` or
-    :math:`(minibatch, C, d_1, d_2, ..., d_K)`
-    with :math:`K \geq 1` for the `K`-dimensional case (described later).
+    def forward(self, input, target):
+        return F.cross_entropy(input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
-    This criterion expects a class index in the range :math:`[0, C-1]` as the
-    `target` for each value of a 1D tensor of size `minibatch`; if `ignore_index`
-    is specified, this criterion also accepts this class index (this index may not
-    necessarily be in the class range).
 
-    The loss can be described as:
+def weighted_cross_entropy(input, target, weight=None, size_average=None, ignore_index=-100,
+                  reduce=None, reduction='mean'):
+    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    r"""This criterion combines `log_softmax` and `nll_loss` in a single
+    function.
 
-    .. math::
-        \text{loss}(x, class) = -\log\left(\frac{\exp(x[class])}{\sum_j \exp(x[j])}\right)
-                       = -x[class] + \log\left(\sum_j \exp(x[j])\right)
-
-    or in the case of the :attr:`weight` argument being specified:
-
-    .. math::
-        \text{loss}(x, class) = weight[class] \left(-x[class] + \log\left(\sum_j \exp(x[j])\right)\right)
-
-    The losses are averaged across observations for each minibatch.
-
-    Can also be used for higher dimension inputs, such as 2D images, by providing
-    an input of size :math:`(minibatch, C, d_1, d_2, ..., d_K)` with :math:`K \geq 1`,
-    where :math:`K` is the number of dimensions, and a target of appropriate shape
-    (see below).
-
+    See :class:`~torch.nn.CrossEntropyLoss` for details.
 
     Args:
-        weight (Tensor, optional): a manual rescaling weight given to each class.
-            If given, has to be a Tensor of size `C`
+        input (Tensor) : :math:`(N, C)` where `C = number of classes` or :math:`(N, C, H, W)`
+            in case of 2D Loss, or :math:`(N, C, d_1, d_2, ..., d_K)` where :math:`K \geq 1`
+            in the case of K-dimensional loss.
+        target (Tensor) : :math:`(N)` where each value is :math:`0 \leq \text{targets}[i] \leq C-1`,
+            or :math:`(N, d_1, d_2, ..., d_K)` where :math:`K \geq 1` for
+            K-dimensional loss.
+        weight (Tensor, optional): a manual rescaling weight given to each
+            class. If given, has to be a Tensor of size `C`
         size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
             the losses are averaged over each loss element in the batch. Note that for
-            some losses, there are multiple elements per sample. If the field :attr:`size_average`
+            some losses, there multiple elements per sample. If the field :attr:`size_average`
             is set to ``False``, the losses are instead summed for each minibatch. Ignored
             when reduce is ``False``. Default: ``True``
         ignore_index (int, optional): Specifies a target value that is ignored
             and does not contribute to the input gradient. When :attr:`size_average` is
-            ``True``, the loss is averaged over non-ignored targets.
+            ``True``, the loss is averaged over non-ignored targets. Default: -100
         reduce (bool, optional): Deprecated (see :attr:`reduction`). By default, the
             losses are averaged or summed over observations for each minibatch depending
             on :attr:`size_average`. When :attr:`reduce` is ``False``, returns a loss per
@@ -82,33 +72,131 @@ class WeightedCrossEntropyLoss(_WeightedLoss):
             and :attr:`reduce` are in the process of being deprecated, and in the meantime,
             specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
 
-    Shape:
-        - Input: :math:`(N, C)` where `C = number of classes`, or
-          :math:`(N, C, d_1, d_2, ..., d_K)` with :math:`K \geq 1`
-          in the case of `K`-dimensional loss.
-        - Target: :math:`(N)` where each value is :math:`0 \leq \text{targets}[i] \leq C-1`, or
-          :math:`(N, d_1, d_2, ..., d_K)` with :math:`K \geq 1` in the case of
-          K-dimensional loss.
-        - Output: scalar.
-          If :attr:`reduction` is ``'none'``, then the same size as the target:
-          :math:`(N)`, or
-          :math:`(N, d_1, d_2, ..., d_K)` with :math:`K \geq 1` in the case
-          of K-dimensional loss.
-
     Examples::
 
-        >>> loss = nn.CrossEntropyLoss()
         >>> input = torch.randn(3, 5, requires_grad=True)
-        >>> target = torch.empty(3, dtype=torch.long).random_(5)
-        >>> output = loss(input, target)
+        >>> target = torch.randint(5, (3,), dtype=torch.int64)
+        >>> loss = F.cross_entropy(input, target)
+        >>> loss.backward()
+    """
+    if size_average is not None or reduce is not None:
+        reduction = _Reduction.legacy_get_string(size_average, reduce)
+    return nll_loss(log_softmax(input, 1), target, weight, None, ignore_index, None, reduction)
+
+
+@weak_script
+def nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
+             reduce=None, reduction='mean'):
+    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    r"""The negative log likelihood loss.
+
+    See :class:`~torch.nn.NLLLoss` for details.
+
+    Args:
+        input: :math:`(N, C)` where `C = number of classes` or :math:`(N, C, H, W)`
+            in case of 2D Loss, or :math:`(N, C, d_1, d_2, ..., d_K)` where :math:`K \geq 1`
+            in the case of K-dimensional loss.
+        target: :math:`(N)` where each value is :math:`0 \leq \text{targets}[i] \leq C-1`,
+            or :math:`(N, d_1, d_2, ..., d_K)` where :math:`K \geq 1` for
+            K-dimensional loss.
+        weight (Tensor, optional): a manual rescaling weight given to each
+            class. If given, has to be a Tensor of size `C`
+        size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
+            the losses are averaged over each loss element in the batch. Note that for
+            some losses, there multiple elements per sample. If the field :attr:`size_average`
+            is set to ``False``, the losses are instead summed for each minibatch. Ignored
+            when reduce is ``False``. Default: ``True``
+        ignore_index (int, optional): Specifies a target value that is ignored
+            and does not contribute to the input gradient. When :attr:`size_average` is
+            ``True``, the loss is averaged over non-ignored targets. Default: -100
+        reduce (bool, optional): Deprecated (see :attr:`reduction`). By default, the
+            losses are averaged or summed over observations for each minibatch depending
+            on :attr:`size_average`. When :attr:`reduce` is ``False``, returns a loss per
+            batch element instead and ignores :attr:`size_average`. Default: ``True``
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            ``'none'`` | ``'mean'`` | ``'sum'``. ``'none'``: no reduction will be applied,
+            ``'mean'``: the sum of the output will be divided by the number of
+            elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
+            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
+            specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
+
+    Example::
+
+        >>> # input is of size N x C = 3 x 5
+        >>> input = torch.randn(3, 5, requires_grad=True)
+        >>> # each element in target has to have 0 <= value < C
+        >>> target = torch.tensor([1, 0, 4])
+        >>> output = F.nll_loss(F.log_softmax(input), target)
         >>> output.backward()
     """
-    __constants__ = ['weight', 'ignore_index', 'reduction']
+    if size_average is not None or reduce is not None:
+        reduction = _Reduction.legacy_get_string(size_average, reduce)
+    dim = input.dim()
+    if dim < 2:
+        raise ValueError('Expected 2 or more dimensions (got {})'.format(dim))
 
-    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
-        super(WeightedCrossEntropyLoss, self).__init__(weight, size_average, reduce, reduction)
-        self.ignore_index = ignore_index
+    if input.size(0) != target.size(0):
+        raise ValueError('Expected input batch_size ({}) to match target batch_size ({}).'
+                         .format(input.size(0), target.size(0)))
+    if dim == 2:
+        ret = torch._C._nn.nll_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index)
+    elif dim == 4:
+        ret = torch._C._nn.nll_loss2d(input, target, weight, _Reduction.get_enum(reduction), ignore_index)
+    else:
+        # dim == 3 or dim > 4
+        n = input.size(0)
+        c = input.size(1)
+        out_size = (n,) + input.size()[2:]
+        if target.size()[1:] != input.size()[2:]:
+            raise ValueError('Expected target size {}, got {}'.format(
+                out_size, target.size()))
+        input = input.contiguous().view(n, c, 1, -1)
+        target = target.contiguous().view(n, 1, -1)
+        reduction_enum = _Reduction.get_enum(reduction)
+        if reduction != 'none':
+            ret = torch._C._nn.nll_loss2d(
+                input, target, weight, reduction_enum, ignore_index)
+        else:
+            out = torch._C._nn.nll_loss2d(
+                input, target, weight, reduction_enum, ignore_index)
+            ret = out.view(out_size)
+    return ret
 
 
-    def forward(self, input, target):
-        return F.cross_entropy(input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
+@weak_script
+def log_softmax(input, dim=None, _stacklevel=3, dtype=None):
+    # type: (Tensor, Optional[int], int, Optional[int]) -> Tensor
+    r"""Applies a softmax followed by a logarithm.
+
+    While mathematically equivalent to log(softmax(x)), doing these two
+    operations separately is slower, and numerically unstable. This function
+    uses an alternative formulation to compute the output and gradient correctly.
+
+    See :class:`~torch.nn.LogSoftmax` for more details.
+
+    Arguments:
+        input (Tensor): input
+        dim (int): A dimension along which log_softmax will be computed.
+        dtype (:class:`torch.dtype`, optional): the desired data type of returned tensor.
+          If specified, the input tensor is casted to :attr:`dtype` before the operation
+          is performed. This is useful for preventing data type overflows. Default: None.
+    """
+    if dim is None:
+        dim = _get_softmax_dim('log_softmax', input.dim(), _stacklevel)
+    if dtype is None:
+        ret = input.log_softmax(dim)
+    else:
+        ret = input.log_softmax(dim, dtype=dtype)
+    return ret
+
+
+@weak_script
+def _get_softmax_dim(name, ndim, stacklevel):
+    # type: (str, int, int) -> int
+    warnings.warn("Implicit dimension choice for {} has been deprecated. "
+                  "Change the call to include dim=X as an argument.".format(name), stacklevel=stacklevel)
+    if ndim == 0 or ndim == 1 or ndim == 3:
+        ret = 0
+    else:
+        ret = 1
+    return ret
