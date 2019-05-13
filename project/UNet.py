@@ -195,7 +195,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 
                 optimizer.step()
 
-                if patch_counter % 1000 == 0:
+                if patch_counter % 1000 == 0 and patch_counter != 0:
                     validation_info.append([epoch, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
 
                 patch_counter += 1
@@ -257,7 +257,7 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=True)
+    device = select_device(force_cpu=False)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)

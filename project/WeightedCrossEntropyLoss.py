@@ -32,8 +32,6 @@ class WeightedCrossEntropyLoss(_WeightedLoss):
 
 
     def forward(self, input, target, wmap):
-        print(target.shape)
-
         return weighted_cross_entropy(input, target, wmap, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
 
