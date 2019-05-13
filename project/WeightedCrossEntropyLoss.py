@@ -75,7 +75,7 @@ def weighted_cross_entropy(input, target, wmap, weight=None, size_average=None, 
 
     if size_average is not None or reduce is not None:
         reduction = _Reduction.legacy_get_string(size_average, reduce)
-    return nll_loss(log_softmax(input, 1), target, wmap, weight, None, ignore_index, None, reduction)
+    return nll_loss(input, target, wmap, weight, None, ignore_index, None, reduction)
 
 
 @weak_script
@@ -115,77 +115,37 @@ def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-
             specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
     """
 
-    if size_average is not None or reduce is not None:
-        reduction = _Reduction.legacy_get_string(size_average, reduce)
+    # if size_average is not None or reduce is not None:
+    #     reduction = _Reduction.legacy_get_string(size_average, reduce)
 
     dim = input.dim()
 
-    if dim < 2:
-        raise ValueError('Expected 2 or more dimensions (got {})'.format(dim))
+    if dim != 2:
+        raise ValueError('Expected 2 dimensions (got {})'.format(dim))
 
     if input.size(0) != target.size(0) or input.size(0) != wmap.size(0):
         raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
                          .format(input.size(0), target.size(0), wmap.size(0)))
 
-    if dim == 2:
-        ret = torch._C._nn.nll_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index)     # TODO: Continue from here.
-    elif dim == 4:
-        ret = torch._C._nn.nll_loss2d(input, target, weight, _Reduction.get_enum(reduction), ignore_index)
-    else:
-        # dim == 3 or dim > 4
-        n = input.size(0)
-        c = input.size(1)
-        out_size = (n,) + input.size()[2:]
-        if target.size()[1:] != input.size()[2:]:
-            raise ValueError('Expected target size {}, got {}'.format(
-                out_size, target.size()))
-        input = input.contiguous().view(n, c, 1, -1)
-        target = target.contiguous().view(n, 1, -1)
-        reduction_enum = _Reduction.get_enum(reduction)
-        if reduction != 'none':
-            ret = torch._C._nn.nll_loss2d(
-                input, target, weight, reduction_enum, ignore_index)
-        else:
-            out = torch._C._nn.nll_loss2d(
-                input, target, weight, reduction_enum, ignore_index)
-            ret = out.view(out_size)
-    return ret
+    # ret = torch._C._nn.nll_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index)     # TODO: Continue from here.
 
+    H = 164
+    W = 164
+    batch_size = 1
 
-@weak_script
-def log_softmax(input, dim=None, _stacklevel=3, dtype=None):
-    # type: (Tensor, Optional[int], int, Optional[int]) -> Tensor
-    r"""Applies a softmax followed by a logarithm.
+    # Calculate log probabilities
+    logp = F.log_softmax(input)
 
-    While mathematically equivalent to log(softmax(x)), doing these two
-    operations separately is slower, and numerically unstable. This function
-    uses an alternative formulation to compute the output and gradient correctly.
+    # Gather log probabilities with respect to target
+    logp = logp.gather(1, target.view(batch_size, 1, H, W))
 
-    See :class:`~torch.nn.LogSoftmax` for more details.
+    # Multiply with weights
+    weighted_logp = (logp * wmap).view(batch_size, -1)
 
-    Arguments:
-        input (Tensor): input
-        dim (int): A dimension along which log_softmax will be computed.
-        dtype (:class:`torch.dtype`, optional): the desired data type of returned tensor.
-          If specified, the input tensor is casted to :attr:`dtype` before the operation
-          is performed. This is useful for preventing data type overflows. Default: None.
-    """
-    if dim is None:
-        dim = _get_softmax_dim('log_softmax', input.dim(), _stacklevel)
-    if dtype is None:
-        ret = input.log_softmax(dim)
-    else:
-        ret = input.log_softmax(dim, dtype=dtype)
-    return ret
+    # Rescale so that loss is in approx. same interval
+    weighted_loss = weighted_logp.sum(1) / wmap.view(batch_size, -1).sum(1)
 
+    # Average over mini-batch
+    weighted_loss = weighted_loss.mean()
 
-@weak_script
-def _get_softmax_dim(name, ndim, stacklevel):
-    # type: (str, int, int) -> int
-    warnings.warn("Implicit dimension choice for {} has been deprecated. "
-                  "Change the call to include dim=X as an argument.".format(name), stacklevel=stacklevel)
-    if ndim == 0 or ndim == 1 or ndim == 3:
-        ret = 0
-    else:
-        ret = 1
-    return ret
+    return weighted_loss
