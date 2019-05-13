@@ -186,7 +186,8 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
                 # loss = criterion(output, torch.argmax(label, 1))
-                loss = criterion(output, torch.argmax(label, 1), wmap)
+                # loss = criterion(output, torch.argmax(label, 1), wmap)
+                loss = criterion(output, label, wmap)
                 loss.backward()
 
                 if patch_counter % 100 == 0:
