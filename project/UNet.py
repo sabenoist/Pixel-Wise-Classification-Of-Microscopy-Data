@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.utils.clip_grad import clip_grad_value_
 
 from device import select_device
 from parameters import get_paths
@@ -149,7 +150,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
     criterion = WeightedCrossEntropyLoss().to(device)
     # criterion = nn.CrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(unet.parameters(), lr=0.01, momentum=0.99)
+    optimizer = torch.optim.SGD(unet.parameters(), lr=0.00001, momentum=0.99)
     optimizer.zero_grad()
 
     loss_info = list()
@@ -172,7 +173,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 label = sample['label'][i]
                 wmap = sample['wmap'][i]
 
-                print('{}. [{}/{}] - {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name))
+
 
                 output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
@@ -181,22 +182,24 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 m = output.shape[0]
 
                 # Resizing the outputs and label to calculate pixel wise softmax loss
-                output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
-                label = label.resize(m * width_out * height_out, 5)  # was nothing
+                output = output.resize(m * width_out * height_out, 5)
+                label = label.resize(m * width_out * height_out, 5)
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
-                # loss = criterion(output, torch.argmax(label, 1))
-                # loss = criterion(output, torch.argmax(label, 1), wmap)
                 loss = criterion(output, label, wmap)
+
+                clip_grad_value_(unet.parameters(), 200)
                 loss.backward()
 
-                if patch_counter % 100 == 0:
+                if patch_counter % 100 == 0 and patch_counter != 0:
                     loss_info.append([epoch, patch_counter, loss.item()])
                 
                 optimizer.step()
 
                 if patch_counter % 1000 == 0 and patch_counter != 0:
                     validation_info.append([epoch, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
+
+                print('{}. [{}/{}] - {} loss: {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name, loss))
 
                 patch_counter += 1
 
@@ -216,10 +219,15 @@ def run_validation(device, unet, validation_set, width_out, height_out):
 
     losses = list()
 
+    validation_counter = 0
+    validation_amount = len(validation_set)
+
     for batch_ndx, sample in enumerate(patch_loader):
         for i in range(batch_size):
             raw = sample['raw'][i]
             label = sample['label'][i]
+
+            print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
 
             output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
@@ -227,12 +235,14 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             m = output.shape[0]
 
             # Resizing the outputs and label to calculate pixel wise softmax loss
-            output = output.resize(m * width_out * height_out, 5)  # was 2, allows the resize to maintain 5 channels, I believe.
-            label = label.resize(m * width_out * height_out, 5)  # was nothing
+            output = output.resize(m * width_out * height_out, 5)
+            label = label.resize(m * width_out * height_out, 5)
 
             loss = criterion(output, torch.argmax(label, 1))
 
             losses.append(loss.item())
+
+            validation_counter += 1
 
     return sum(losses) / len(losses)
 

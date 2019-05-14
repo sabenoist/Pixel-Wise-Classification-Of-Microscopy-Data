@@ -12,7 +12,7 @@ def select_device(force_cpu=True):
 
             return torch.device('cuda')  # GPU
         except:
-            print('Warning: CUDA is broken. Using CPU instead.')
+            print('Warning: CUDA is unavailable. Using CPU instead.')
 
             return torch.device('cpu')  # CPU
     else:
