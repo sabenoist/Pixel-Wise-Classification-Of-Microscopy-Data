@@ -147,8 +147,9 @@ class UNet(nn.Module):
 
 
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
-    criterion = WeightedCrossEntropyLoss().to(device)
+    # criterion = WeightedCrossEntropyLoss().to(device)
     # criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.TripletMarginLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=0.00001, momentum=0.99)
     optimizer.zero_grad()
@@ -172,8 +173,6 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 raw = sample['raw'][i]
                 label = sample['label'][i]
                 wmap = sample['wmap'][i]
-
-
 
                 output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
