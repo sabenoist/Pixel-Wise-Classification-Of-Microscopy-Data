@@ -146,7 +146,7 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=5):
     # criterion = WeightedCrossEntropyLoss().to(device)
     # criterion = nn.CrossEntropyLoss().to(device)
     criterion = nn.TripletMarginLoss().to(device)
@@ -202,7 +202,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 patch_counter += 1
 
-    model_name = 'test_loss_info'
+    model_name = 'test_triplemargingloss_5epochs'
     save_model(unet, paths['model_dir'], model_name + '.pickle')
     save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
     save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
@@ -221,28 +221,32 @@ def run_validation(device, unet, validation_set, width_out, height_out):
     validation_counter = 0
     validation_amount = len(validation_set)
 
-    for batch_ndx, sample in enumerate(patch_loader):
-        for i in range(batch_size):
-            raw = sample['raw'][i]
-            label = sample['label'][i]
+    unet.eval()
 
-            print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
+    with torch.no_grad():
+        for batch_ndx, sample in enumerate(patch_loader):
+            for i in range(batch_size):
+                raw = sample['raw'][i]
+                label = sample['label'][i]
 
-            output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
+                print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
 
-            output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
-            m = output.shape[0]
+                output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
-            # Resizing the outputs and label to calculate pixel wise softmax loss
-            output = output.resize(m * width_out * height_out, 5)
-            label = label.resize(m * width_out * height_out, 5)
+                output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+                m = output.shape[0]
 
-            loss = criterion(output, torch.argmax(label, 1))
+                # Resizing the outputs and label to calculate pixel wise softmax loss
+                output = output.resize(m * width_out * height_out, 5)
+                label = label.resize(m * width_out * height_out, 5)
 
-            losses.append(loss.item())
+                loss = criterion(output, torch.argmax(label, 1))
 
-            validation_counter += 1
+                losses.append(loss.item())
 
+                validation_counter += 1
+
+    unet.train()
     return sum(losses) / len(losses)
 
 
@@ -266,7 +270,7 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=False)
+    device = select_device(force_cpu=True)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
