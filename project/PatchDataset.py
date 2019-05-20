@@ -25,8 +25,7 @@ class PatchDataset(Dataset):
         raw = raw.to(self.device)
 
         label = torch.from_numpy(io.imread('{}/{}'.format(self.label_path, patch_name)))
-        # label = label.to(self.device, dtype=torch.int64)
-        label = label.to(self.device, dtype=torch.float)
+        label = label.to(self.device, dtype=torch.int64)
 
         wmap = torch.from_numpy(io.imread('{}/{}'.format(self.wmap_path, patch_name)))
         wmap = wmap.to(self.device)

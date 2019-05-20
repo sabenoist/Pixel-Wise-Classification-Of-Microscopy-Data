@@ -3,14 +3,12 @@ from UNet import UNet
 from parameters import *
 import torch
 import numpy as np
-import skimage.io as io
 import matplotlib.pyplot as plt
 from PatchDataset import PatchDataset
-from torch.utils.data import DataLoader
 
 
 paths = get_paths()
-path = '{}/testGPU.pickle'.format(paths['model_dir'])
+path = '{}/5_epochs_10e-4_lr_0.99_momentum.pickle'.format(paths['model_dir'])
 
 
 def torch_summarize(model, show_weights=True, show_parameters=True):
@@ -41,67 +39,37 @@ def torch_summarize(model, show_weights=True, show_parameters=True):
     return tmpstr
 
 
-def plot_5L_tensors(raw, output):
+def inspect_model(raw, label, output):
     raw = raw.numpy()
-    output = output.detach().numpy()  # detaches grad from variable
+    label = label.numpy()
+    output = output.detach().numpy()
 
-    plt.subplot(2, 3, 1)
+    plt.subplot(3, 5, 3)
     plt.imshow(raw)
 
-    plt.subplot(2, 3, 2)
-    plt.imshow(output[0, 0, :, :])
+    for i in range(5):
+        plt.subplot(3, 5, 6 + i)
+        plt.imshow(label[:, :, i])
 
-    plt.subplot(2, 3, 3)
-    plt.imshow(output[0, 1, :, :])
-
-    plt.subplot(2, 3, 4)
-    plt.imshow(output[0, 2, :, :])
-
-    plt.subplot(2, 3, 5)
-    plt.imshow(output[0, 3, :, :])
-
-    plt.subplot(2, 3, 6)
-    plt.imshow(output[0, 4, :, :])
-
-    plt.show()
-
-
-def plot_2d_tensors(raw, output):
-    raw = raw.numpy()
-    output = output.detach().numpy()  # detaches grad from variable
-
-    plt.subplot(1, 2, 1)
-    plt.imshow(raw)
-
-    plt.subplot(1, 2, 2)
-    plt.imshow(output[0, :, :])
+    for i in range(5):
+        plt.subplot(3, 5, 11 + i)
+        plt.imshow(output[0, i, :, :])
 
     plt.show()
 
 
 model = UNet(in_channel=1, out_channel=5)
 model.load_state_dict(torch.load(path))
-# model.eval()
+model.eval()
 
 print(torch_summarize(model))
 
 patches = PatchDataset(paths['out_dir'], torch.device('cpu'))
 
-# output = model(patches[0]['raw'][None][None])
-#
-# print(output.shape)
-# plot_5L_tensors(patches[0]['raw'], output)
-#
-# predicted, _ = torch.max(output, 1)
-# print(predicted.shape)
-# plot_2d_tensors(patches[0]['raw'], predicted)
+output = model(patches[0]['raw'][None][None])
 
-with torch.no_grad():
-    for i in range(1):
-        output = model(patches[i]['raw'][None][None])
-        plot_5L_tensors(patches[i]['raw'], output)
+for i in range(1,2):
+    output = model(patches[i]['raw'][None][None])
 
-        print(output.shape)
-
-        # predicted, _ = torch.max(output, 1)
-        # plot_2d_tensors(patches[i]['raw'], predicted)
+    print(patches[i]['patch_name'])
+    inspect_model(patches[i]['raw'], patches[i]['label'], output)

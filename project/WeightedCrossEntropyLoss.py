@@ -65,10 +65,10 @@ def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-
     wmap = Variable(wmap)
 
     # Calculate log probabilities
-    logp = F.log_softmax(input)    # apply 200 clipping to logp per pixel
+    logp = -F.log_softmax(input)
 
     # Gather log probabilities with respect to target
-    logp = logp.gather(1, target.view(H * W, 5))    # softmaxed input - labels
+    logp = logp.gather(1, target.view(H * W, 5))    #  = softmaxed input - labels
 
     # Multiply with weights
     weighted_logp = (logp * wmap).view(batch_size, -1)

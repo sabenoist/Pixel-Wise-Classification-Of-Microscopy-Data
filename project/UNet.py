@@ -2,13 +2,10 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.nn.utils.clip_grad import clip_grad_value_
 
 from device import select_device
 from parameters import get_paths
 from PatchDataset import PatchDataset
-from ValidationSet import ValidationSet
 from WeightedCrossEntropyLoss import WeightedCrossEntropyLoss
 from torch.utils.data import DataLoader
 
@@ -147,12 +144,10 @@ class UNet(nn.Module):
 
 
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=5):
-    # criterion = WeightedCrossEntropyLoss().to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
-    criterion = nn.TripletMarginLoss().to(device)
+    criterion = WeightedCrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(unet.parameters(), lr=0.00001, momentum=0.99)
-    optimizer.zero_grad()
+    optimizer = torch.optim.SGD(unet.parameters(), lr=10e-4, momentum=0.99)
+    optimizer.zero_grad() # initializes the gradient with random weights
 
     loss_info = list()
     validation_info = list()
@@ -164,10 +159,13 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
         patches_amount = len(dataset)
         patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
-            # if patch_counter >= 1:
+            # if patch_counter >= 200:
             #     break
 
             for i in range(batch_size):
+                # if patch_counter >= 200:
+                #     break
+
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = sample['raw'][i]
@@ -186,15 +184,15 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
                 loss = criterion(output, label, wmap)
-
-                clip_grad_value_(unet.parameters(), 200)
                 loss.backward()
 
-                if patch_counter % 100 == 0 and patch_counter != 0:
-                    loss_info.append([epoch, patch_counter, loss.item()])
-                
                 optimizer.step()
 
+                # save loss info per 100 images
+                if patch_counter % 100 == 0 and patch_counter != 0:
+                    loss_info.append([epoch, patch_counter, loss.item()])
+
+                # perform validation per 1000 images
                 if patch_counter % 1000 == 0 and patch_counter != 0:
                     validation_info.append([epoch, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
 
@@ -202,7 +200,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 patch_counter += 1
 
-    model_name = 'test_triplemargingloss_5epochs'
+    model_name = '1_epoch_10e-4_lr_0.99_momentum'
     save_model(unet, paths['model_dir'], model_name + '.pickle')
     save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
     save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
@@ -211,7 +209,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 def run_validation(device, unet, validation_set, width_out, height_out):
     print("running validation test")
 
-    criterion = nn.CrossEntropyLoss().to(device)
+    validation_criterion = WeightedCrossEntropyLoss().to(device)
 
     batch_size = 200
     patch_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0)
@@ -221,32 +219,34 @@ def run_validation(device, unet, validation_set, width_out, height_out):
     validation_counter = 0
     validation_amount = len(validation_set)
 
-    unet.eval()
+    unet.eval()  # sets the network to stop learning
 
-    with torch.no_grad():
-        for batch_ndx, sample in enumerate(patch_loader):
-            for i in range(batch_size):
-                raw = sample['raw'][i]
-                label = sample['label'][i]
+    for batch_ndx, sample in enumerate(patch_loader):
+        for i in range(batch_size):
+            raw = sample['raw'][i]
+            label = sample['label'][i]
+            wmap = sample['wmap'][i]
 
-                print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
+            print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
 
-                output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
+            output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
-                output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
-                m = output.shape[0]
+            output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+            m = output.shape[0]
 
-                # Resizing the outputs and label to calculate pixel wise softmax loss
-                output = output.resize(m * width_out * height_out, 5)
-                label = label.resize(m * width_out * height_out, 5)
+            # Resizing the outputs and label to calculate pixel wise softmax loss
+            output = output.resize(m * width_out * height_out, 5)
+            label = label.resize(m * width_out * height_out, 5)
+            wmap = wmap.resize(m * width_out * height_out, 1)
 
-                loss = criterion(output, torch.argmax(label, 1))
+            loss = validation_criterion(output, label, wmap)
 
-                losses.append(loss.item())
+            losses.append(loss.item())
 
-                validation_counter += 1
+            validation_counter += 1
 
-    unet.train()
+    unet.train()  # sets the network to start learning again
+
     return sum(losses) / len(losses)
 
 
@@ -270,14 +270,14 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=True)
+    device = select_device(force_cpu=False)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
 
     paths = get_paths()
-    patches = PatchDataset(paths['out_dir'], device)
 
-    validation_set = ValidationSet(paths['val_dir'], device)
+    training_set = PatchDataset(paths['out_dir'], device)
+    validation_set = PatchDataset(paths['val_dir'], device)
 
-    train_UNet(device, unet, patches, validation_set, width_out=164, height_out=164)
+    train_UNet(device, unet, training_set, validation_set, width_out=164, height_out=164)
