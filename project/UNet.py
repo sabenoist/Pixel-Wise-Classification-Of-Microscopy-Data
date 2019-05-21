@@ -143,10 +143,11 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=5):
-    criterion = WeightedCrossEntropyLoss().to(device)
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
+    # criterion = WeightedCrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(unet.parameters(), lr=10e-4, momentum=0.99)
+    optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
     optimizer.zero_grad() # initializes the gradient with random weights
 
     loss_info = list()
@@ -159,13 +160,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
         patches_amount = len(dataset)
         patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
-            # if patch_counter >= 200:
-            #     break
-
             for i in range(batch_size):
-                # if patch_counter >= 200:
-                #     break
-
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = sample['raw'][i]
@@ -183,7 +178,8 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 label = label.resize(m * width_out * height_out, 5)
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
-                loss = criterion(output, label, wmap)
+                # loss = criterion(output, label, wmap)
+                loss = criterion(output, torch.argmax(label, dim=1))
                 loss.backward()
 
                 optimizer.step()
@@ -200,7 +196,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 patch_counter += 1
 
-    model_name = '1_epoch_10e-4_lr_0.99_momentum'
+    model_name = '10_epochs_noWmap'
     save_model(unet, paths['model_dir'], model_name + '.pickle')
     save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
     save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
