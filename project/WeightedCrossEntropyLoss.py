@@ -78,6 +78,6 @@ def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-
     weighted_loss = weighted_logp / (H * W)
 
     # Average over mini-batch
-    weighted_loss = weighted_loss.mean()
+    weighted_loss = weighted_loss.sum()
 
     return weighted_loss

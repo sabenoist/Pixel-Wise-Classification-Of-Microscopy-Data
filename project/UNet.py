@@ -7,6 +7,7 @@ from device import select_device
 from parameters import get_paths
 from PatchDataset import PatchDataset
 from WeightedCrossEntropyLoss import WeightedCrossEntropyLoss
+from SpatialWeightedSGD import SpatialWeightedSGD
 from torch.utils.data import DataLoader
 
 import warnings
@@ -52,7 +53,7 @@ class UNet(nn.Module):
         self.conv_decode4 = self.expansive_block(layer5_size, layer4_size, layer3_size)
         self.conv_decode3 = self.expansive_block(layer4_size, layer3_size, layer2_size)
         self.conv_decode2 = self.expansive_block(layer3_size, layer2_size, layer1_size)
-        self.final_layer = self.final_block(layer2_size, layer1_size, out_channel)
+        self.final_layer = self.final_block(layer2_size, layer1_size , out_channel)
 
 
     def contracting_block(self, in_channels, out_channels, kernel_size=3):
@@ -147,7 +148,8 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
     # criterion = WeightedCrossEntropyLoss().to(device)
     criterion = nn.CrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
+    # optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
+    optimizer = SpatialWeightedSGD(unet.parameters(), lr=5 * 10e-5, momentum=0.99)
     optimizer.zero_grad() # initializes the gradient with random weights
 
     loss_info = list()
@@ -160,7 +162,13 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
         patches_amount = len(dataset)
         patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
+            if patch_counter >= 1:
+                break
+
             for i in range(batch_size):
+                if patch_counter >= 1:
+                    break
+
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = sample['raw'][i]
@@ -173,16 +181,22 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
                 m = output.shape[0]
 
+                print(output.shape)
+
                 # Resizing the outputs and label to calculate pixel wise softmax loss
                 output = output.resize(m * width_out * height_out, 5)
                 label = label.resize(m * width_out * height_out, 5)
-                wmap = wmap.resize(m * width_out * height_out, 1)
+                # wmap = wmap.resize(m * width_out * height_out, 1)
+
+                print(output.shape)
+                print(wmap.shape)
 
                 # loss = criterion(output, label, wmap)
                 loss = criterion(output, torch.argmax(label, dim=1))
                 loss.backward()
 
-                optimizer.step()
+                # optimizer.step()
+                optimizer.step(wmap)
 
                 # save loss info per 100 images
                 if patch_counter % 100 == 0 and patch_counter != 0:
@@ -196,10 +210,10 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 patch_counter += 1
 
-    model_name = '10_epochs_noWmap'
-    save_model(unet, paths['model_dir'], model_name + '.pickle')
-    save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
-    save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
+    # model_name = '10_epochs_noWmap'
+    # save_model(unet, paths['model_dir'], model_name + '.pickle')
+    # save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
+    # save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
 
 
 def run_validation(device, unet, validation_set, width_out, height_out):
@@ -233,7 +247,7 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             # Resizing the outputs and label to calculate pixel wise softmax loss
             output = output.resize(m * width_out * height_out, 5)
             label = label.resize(m * width_out * height_out, 5)
-            wmap = wmap.resize(m * width_out * height_out, 1)
+            # wmap = wmap.resize(m * width_out * height_out, 1)
 
             loss = validation_criterion(output, label, wmap)
 
@@ -266,7 +280,7 @@ def save_loss_info(loss_info, path, name):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=False)
+    device = select_device(force_cpu=True)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)

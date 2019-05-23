@@ -62,7 +62,7 @@ class SpatialWeightedSGD(Optimizer):
             group.setdefault('nesterov', False)
 
 
-    def step(self, closure=None):
+    def step(self, wmap, closure=None):
         """Performs a single optimization step.
 
         Arguments:
@@ -79,10 +79,16 @@ class SpatialWeightedSGD(Optimizer):
             dampening = group['dampening']
             nesterov = group['nesterov']
 
+            final_layer_index = len(group['params']) - 4
+            layer_index = 0
             for p in group['params']:
                 if p.grad is None:
                     continue
+
                 d_p = p.grad.data
+
+                print(type(p), d_p.shape)
+
                 if weight_decay != 0:
                     d_p.add_(weight_decay, p.data)
                 if momentum != 0:
@@ -97,6 +103,14 @@ class SpatialWeightedSGD(Optimizer):
                     else:
                         d_p = buf
 
-                p.data.add_(-group['lr'], d_p)
+                if layer_index == final_layer_index:
+                    print(wmap)
+                    # print("wmap.shape=", wmap.shape)
+                    # print("gradient.shape=", d_p.shape)
+                    pass
+                else:
+                    p.data.add_(-group['lr'], d_p)
+
+                layer_index += 1
 
         return loss
