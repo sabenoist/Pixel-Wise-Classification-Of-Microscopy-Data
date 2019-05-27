@@ -146,14 +146,14 @@ class UNet(nn.Module):
 
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
     criterion = WeightedCrossEntropyLoss().to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
-    # optimizer = SpatialWeightedSGD(unet.parameters(), lr=5 * 10e-5, momentum=0.99)
     optimizer.zero_grad() # initializes the gradient with random weights
 
     loss_info = list()
     validation_info = list()
+
+    mean, var = read_mean_var()
 
     for epoch in range(epochs):
         batch_size = 200
@@ -162,16 +162,16 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
         patches_amount = len(dataset)
         patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
-            if patch_counter >= 1:
-                break
+            # if patch_counter >= 1:
+            #     break
 
             for i in range(batch_size):
-                if patch_counter >= 1:
-                    break
+                # if patch_counter >= 1:
+                #     break
 
                 # Forward part
                 patch_name = sample['patch_name'][i]
-                raw = sample['raw'][i]
+                raw = normalize_input(sample['raw'][i], mean, var)
                 label = sample['label'][i]
                 wmap = sample['wmap'][i]
 
@@ -181,22 +181,15 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
                 m = output.shape[0]
 
-                print(output.shape)
-
                 # Resizing the outputs and label to calculate pixel wise softmax loss
                 output = output.resize(m * width_out * height_out, 5)
                 label = label.resize(m * width_out * height_out, 5)
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
-                print(output.shape)
-                print(wmap.shape)
-
                 loss = criterion(output, label, wmap)
-                # loss = criterion(output, torch.argmax(label, dim=1))
                 loss.backward()
 
-                # optimizer.step()
-                optimizer.step(wmap)
+                optimizer.step()
 
                 # save loss info per 100 images
                 if patch_counter % 100 == 0 and patch_counter != 0:
@@ -277,6 +270,19 @@ def save_loss_info(loss_info, path, name):
         file.write('{}  {}  {}\n'.format(info[0], info[1], info[2]))
 
     file.close()
+
+
+def read_mean_var():
+    file = open('{}/patch_mean_var.txt'.format(paths['out_dir'])).readlines()
+
+    mean = float(file[0].split()[-1])
+    var = float(file[1].split()[-1])
+
+    return [mean, var]
+
+
+def normalize_input(input, mean, var):
+    return input.add(-mean).div(var)
 
 
 if __name__ == '__main__':
