@@ -145,11 +145,11 @@ class UNet(nn.Module):
 
 
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
-    # criterion = WeightedCrossEntropyLoss().to(device)
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = WeightedCrossEntropyLoss().to(device)
+    # criterion = nn.CrossEntropyLoss().to(device)
 
-    # optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
-    optimizer = SpatialWeightedSGD(unet.parameters(), lr=5 * 10e-5, momentum=0.99)
+    optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
+    # optimizer = SpatialWeightedSGD(unet.parameters(), lr=5 * 10e-5, momentum=0.99)
     optimizer.zero_grad() # initializes the gradient with random weights
 
     loss_info = list()
@@ -186,13 +186,13 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 # Resizing the outputs and label to calculate pixel wise softmax loss
                 output = output.resize(m * width_out * height_out, 5)
                 label = label.resize(m * width_out * height_out, 5)
-                # wmap = wmap.resize(m * width_out * height_out, 1)
+                wmap = wmap.resize(m * width_out * height_out, 1)
 
                 print(output.shape)
                 print(wmap.shape)
 
-                # loss = criterion(output, label, wmap)
-                loss = criterion(output, torch.argmax(label, dim=1))
+                loss = criterion(output, label, wmap)
+                # loss = criterion(output, torch.argmax(label, dim=1))
                 loss.backward()
 
                 # optimizer.step()
@@ -247,7 +247,7 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             # Resizing the outputs and label to calculate pixel wise softmax loss
             output = output.resize(m * width_out * height_out, 5)
             label = label.resize(m * width_out * height_out, 5)
-            # wmap = wmap.resize(m * width_out * height_out, 1)
+            wmap = wmap.resize(m * width_out * height_out, 1)
 
             loss = validation_criterion(output, label, wmap)
 

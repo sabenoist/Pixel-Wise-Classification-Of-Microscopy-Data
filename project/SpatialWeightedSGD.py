@@ -104,7 +104,7 @@ class SpatialWeightedSGD(Optimizer):
                         d_p = buf
 
                 if layer_index == final_layer_index:
-                    print(wmap)
+                    print(d_p)
                     # print("wmap.shape=", wmap.shape)
                     # print("gradient.shape=", d_p.shape)
                     pass

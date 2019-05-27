@@ -65,7 +65,7 @@ def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-
     wmap = Variable(wmap)
 
     # Calculate log probabilities
-    logp = -F.log_softmax(input)
+    logp = F.log_softmax(input)
 
     # Gather log probabilities with respect to target
     logp = logp.gather(1, target.view(H * W, 5))    #  = softmaxed input - labels
@@ -78,6 +78,6 @@ def nll_loss(input, target, wmap, weight=None, size_average=None, ignore_index=-
     weighted_loss = weighted_logp / (H * W)
 
     # Average over mini-batch
-    weighted_loss = weighted_loss.sum()
+    weighted_loss = -weighted_loss.mean()
 
     return weighted_loss
