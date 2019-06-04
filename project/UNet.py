@@ -144,11 +144,13 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=5):
+    model_name = '5_epochs'
+
     criterion = WeightedCrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=5*10e-5, momentum=0.99)
-    optimizer.zero_grad() # initializes the gradient with random weights
+    optimizer.zero_grad() # sets the gradient to accumulate instead of replace.
 
     loss_info = list()
     validation_info = list()
@@ -199,14 +201,17 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 if patch_counter % 1000 == 0 and patch_counter != 0:
                     validation_info.append([epoch, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
 
+                # save model every 2000 images
+                if patch_counter % 2000 == 0 and patch_counter != 0:
+                    save_model(unet, paths['model_dir'], model_name + '_' + patch_counter + '.pickle')
+
                 print('{}. [{}/{}] - {} loss: {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name, loss))
 
                 patch_counter += 1
 
-    # model_name = '10_epochs_noWmap'
-    # save_model(unet, paths['model_dir'], model_name + '.pickle')
-    # save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
-    # save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
+    save_model(unet, paths['model_dir'], model_name + '.pickle')
+    save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
+    save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
 
 
 def run_validation(device, unet, validation_set, width_out, height_out):
@@ -230,8 +235,6 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             label = sample['label'][i]
             wmap = sample['wmap'][i]
 
-            print('validation. [{}/{}]'.format(validation_counter + 1, validation_amount))
-
             output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
             output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
@@ -243,6 +246,8 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             wmap = wmap.resize(m * width_out * height_out, 1)
 
             loss = validation_criterion(output, label, wmap)
+
+            print('validation. [{}/{}] - loss: {}'.format(validation_counter + 1, validation_amount, loss.item()))
 
             losses.append(loss.item())
 
@@ -286,7 +291,7 @@ def normalize_input(input, mean, var):
 
 
 if __name__ == '__main__':
-    device = select_device(force_cpu=True)
+    device = select_device(force_cpu=False)
 
     unet = UNet(in_channel=1, out_channel=5)  # out_channel represents number of segments desired
     unet = unet.to(device)
