@@ -1,8 +1,8 @@
 import numpy as np
 
 def get_paths():
-    dataset = '20190326'
-    root_dir = 'D:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
+    dataset = '20190315_exp_1_pos_00'
+    root_dir = 'E:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
 
     out_dir = '{}/patches/'.format(root_dir)
 

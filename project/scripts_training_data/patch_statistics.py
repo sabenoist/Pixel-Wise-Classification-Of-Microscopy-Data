@@ -48,7 +48,7 @@ def count_classes(gt_path):
 
 	patches = [a for a in os.listdir(gt_path) if a.endswith('.tif')]
 
-	classes = np.zeros(5)
+	classes = np.zeros(6) # was 5.
 
 	for p in patches:
 		clear_output(wait=True)

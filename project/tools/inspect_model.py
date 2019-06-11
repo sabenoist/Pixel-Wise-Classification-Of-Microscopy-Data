@@ -8,7 +8,7 @@ from PatchDataset import PatchDataset
 
 
 paths = get_paths()
-path = '{}/overfitting_patch_00001_10e-4.pickle'.format(paths['model_dir'])
+path = '{}/10epochs_noWmap_epoch_4_patch_30000.pickle'.format(paths['model_dir'])
 
 
 def torch_summarize(model, show_weights=True, show_parameters=True):
@@ -40,47 +40,63 @@ def torch_summarize(model, show_weights=True, show_parameters=True):
 
 
 def inspect_model(raw, label, output):
-    print(output.shape)
-
     raw = raw.numpy()
     label = label.numpy()
     output = output.detach().numpy()
 
-    plt.subplot(3, 5, 1)
+    plt.subplot(3, 6, 1)
     plt.imshow(raw)
 
-    for i in range(5):
-        plt.subplot(3, 5, 6 + i)
+    for i in range(6):
+        plt.subplot(3, 6, 7 + i)
         plt.imshow(label[:, :, i])
 
-    for i in range(5):
-        plt.subplot(3, 5, 11 + i)
+    for i in range(6):
+        plt.subplot(3, 6, 13 + i)
         plt.imshow(output[0, i, :, :])
 
 
     output_classes = np.argmax(output, axis=1)
-    plt.subplot(3, 5, 5)
+    plt.subplot(3, 6, 5)
     plt.imshow(output_classes[0,...])
 
     label_classes = np.argmax(label, axis=2)
-    plt.subplot(3, 5, 3)
+    plt.subplot(3, 6, 3)
     plt.imshow(label_classes)
 
     plt.show()
 
 
-model = UNet(in_channel=1, out_channel=5)
+def read_mean_var():
+    file = open('{}/patch_mean_var.txt'.format(paths['out_dir'])).readlines()
+
+    mean = float(file[0].split()[-1])
+    var = float(file[1].split()[-1])
+
+    return [mean, var]
+
+
+def normalize_input(input, mean, var):
+    if var <= 0:
+        var = 1
+    return input.add(-mean).div(var)
+
+
+model = UNet(in_channel=1, out_channel=6)
 model.load_state_dict(torch.load(path))
 model.eval()
 
 print(torch_summarize(model))
 
-patches = PatchDataset(paths['out_dir'], torch.device('cpu'))
+# layer = -4
+# print(list(model.parameters())[layer].data.shape)
+# print(list(model.parameters())[layer].data[:,1,:,:])
 
-output = model(patches[0]['raw'][None][None])
+patches = PatchDataset(paths['out_dir'], torch.device('cpu'))
+mean, var = read_mean_var()
 
 for i in range(1,2):
     output = model(patches[i]['raw'][None][None])
 
     print(patches[i]['patch_name'])
-    inspect_model(patches[i]['raw'], patches[i]['label'], output)
+    inspect_model(normalize_input(patches[i]['raw'], mean, var), patches[i]['label'], output)

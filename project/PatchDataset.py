@@ -5,9 +5,10 @@ from skimage import io
 
 
 class PatchDataset(Dataset):
-    def __init__(self, root_path, device):
+    def __init__(self, root_path, device, use_wmap=True):
         self.root_path = root_path
         self.device = device
+        self.use_wmap = use_wmap
 
         self.raw_path = '{}/raw/'.format(root_path)
         self.label_path = '{}/label/'.format(root_path)
@@ -27,9 +28,12 @@ class PatchDataset(Dataset):
         label = torch.from_numpy(io.imread('{}/{}'.format(self.label_path, patch_name)))
         label = label.to(self.device, dtype=torch.int64)
 
-        wmap = torch.from_numpy(io.imread('{}/{}'.format(self.wmap_path, patch_name)))
-        wmap = wmap.to(self.device)
+        if self.use_wmap:
+            wmap = torch.from_numpy(io.imread('{}/{}'.format(self.wmap_path, patch_name)))
+            wmap = wmap.to(self.device)
 
-        sample = {'patch_name': patch_name, 'raw': raw, 'label': label, 'wmap': wmap}
+            sample = {'patch_name': patch_name, 'raw': raw, 'label': label, 'wmap': wmap}
+        else:
+            sample = {'patch_name': patch_name, 'raw': raw, 'label': label}
 
         return sample
