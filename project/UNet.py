@@ -144,11 +144,11 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
-    model_name = 'test'
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
+    model_name = 'stock_criterion_1ep'
 
-    criterion = WeightedCrossEntropyLoss().to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
+    # criterion = WeightedCrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=10e-5, momentum=0.99)
     optimizer.zero_grad() # sets the gradient to accumulate instead of replace.
@@ -165,12 +165,12 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
         patches_amount = len(dataset)
         patch_counter = 0
         for batch_ndx, sample in enumerate(patch_loader):
-            if patch_counter >= 10:
-                return
+            # if patch_counter >= 1:
+            #     return
 
             for i in range(len(sample['patch_name'])):
-                if patch_counter >= 10:
-                    return
+                # if patch_counter >= 1:
+                #     return
 
                 # Forward part
                 patch_name = sample['patch_name'][i]
@@ -183,6 +183,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 # Backwards part
                 output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+                label = label.unsqueeze(0)
                 m = output.shape[0]
 
                 # Resizing the outputs and label to calculate pixel wise softmax loss
@@ -191,8 +192,8 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
                 # print(torch.max(label, 1).shape)
-                # loss = criterion(output, torch.max(label, 1)[1])
-                loss = criterion(output, label, wmap=wmap)
+                loss = criterion(output, torch.max(label, 1)[1])
+                # loss = criterion(output, label, wmap=wmap, use_wmap=False)
                 loss.backward()
 
                 optimizer.step()
@@ -213,16 +214,16 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 patch_counter += 1
 
-    # save_model(unet, paths['model_dir'], model_name + '.pickle')
-    # save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
-    # save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
+    save_model(unet, paths['model_dir'], model_name + '.pickle')
+    save_loss_info(loss_info, paths['model_dir'], model_name + '_loss.txt')
+    save_loss_info(validation_info, paths['model_dir'], model_name + '_validation.txt')
 
 
 def run_validation(device, unet, validation_set, width_out, height_out):
     print("running validation test")
 
-    validation_criterion = WeightedCrossEntropyLoss().to(device)
-    # validation_criterion = nn.CrossEntropyLoss().to(device)
+    # validation_criterion = WeightedCrossEntropyLoss().to(device)
+    validation_criterion = nn.CrossEntropyLoss().to(device)
 
     batch_size = 200
     patch_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0)
@@ -245,14 +246,16 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
             output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
+
             m = output.shape[0]
+            label = label.unsqueeze(0)
 
             # Resizing the outputs and label to calculate pixel wise softmax loss
             output = output.resize(m * width_out * height_out, 6)
             label = label.resize(m * width_out * height_out, 6)
 
-            loss = validation_criterion(output, label, use_wmap=False)
-            # loss = validation_criterion(output, torch.max(label, 1)[1])
+            # loss = validation_criterion(output, label, use_wmap=False)
+            loss = validation_criterion(output, torch.max(label, 1)[1])
 
             print('validation. [{}/{}] {} - loss: {}'.format(validation_counter + 1, validation_amount, patch_name, loss.item()))
 

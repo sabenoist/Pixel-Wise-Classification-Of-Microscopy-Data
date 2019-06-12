@@ -73,7 +73,7 @@ def nll_loss(input, target, wmap=None, use_wmap=True, weight=None, size_average=
     # Calculate log probabilities
     logp = F.log_softmax(input)
     # logp = F.softmax(input)
-    logp = torch.exp(logp)
+    # logp = torch.exp(logp)
 
     # Gather log probabilities with respect to target
     logp = logp.gather(1, target.view(H * W, 6))    #  = softmaxed input - labels
@@ -86,9 +86,10 @@ def nll_loss(input, target, wmap=None, use_wmap=True, weight=None, size_average=
 
     # Rescale so that loss is in approx. same interval
     # weighted_loss = weighted_logp.sum(1) / wmap.view(batch_size, -1).sum(1)
-    weighted_loss = weighted_logp.sum(1) / (H * W)
+    weighted_loss = weighted_logp / (H * W)
+    # weighted_loss = weighted_logp
 
     # Average over mini-batch
     weighted_loss = weighted_loss.mean()
 
-    return weighted_loss
+    return -weighted_loss

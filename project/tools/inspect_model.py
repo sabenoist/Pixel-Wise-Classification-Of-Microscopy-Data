@@ -99,4 +99,5 @@ for i in range(1,2):
     output = model(patches[i]['raw'][None][None])
 
     print(patches[i]['patch_name'])
-    inspect_model(normalize_input(patches[i]['raw'], mean, var), patches[i]['label'], output)
+    label = patches[i]['label']
+    inspect_model(normalize_input(patches[i]['raw'], mean, var), label, output)
