@@ -32,64 +32,93 @@ class WeightedCrossEntropyLoss(_WeightedLoss):
         self.ignore_index = ignore_index
 
 
-    def forward(self, input, target, wmap=None, use_wmap=True):
-        return weighted_cross_entropy(input, target, wmap=wmap, use_wmap=use_wmap, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
+    def forward(self, input, target, wmap=None):
+        return weighted_cross_entropy(input, target, wmap=wmap, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
 
-def weighted_cross_entropy(input, target, wmap=None, use_wmap=True, weight=None, size_average=None, ignore_index=-100,
+def weighted_cross_entropy(input, target, wmap=None, weight=None, size_average=None, ignore_index=-100,
                   reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    # type: (Tensor, Tensor, Optional[Tensor], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
 
     if size_average is not None or reduce is not None:
         reduction = _Reduction.legacy_get_string(size_average, reduce)
-    return nll_loss(input, target, wmap, use_wmap, weight, None, ignore_index, None, reduction)
+    return nll_loss(input, target, wmap,  weight, None, ignore_index, None, reduction)
+
+
+# @weak_script
+# def nll_loss(input, target, wmap=None, use_wmap=True, weight=None, size_average=None, ignore_index=-100,
+#              reduce=None, reduction='mean'):
+    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+
+    # dim = input.dim()
+    #
+    # if dim != 2:
+    #     raise ValueError('Expected 2 dimensions (got {})'.format(dim))
+    # if use_wmap:
+    #     if input.size(0) != target.size(0) or input.size(0) != wmap.size(0):
+    #         raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
+    #                          .format(input.size(0), target.size(0), wmap.size(0)))
+    # else:
+    #     if input.size(0) != target.size(0):
+    #         raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
+    #                          .format(input.size(0), target.size(0), wmap.size(0)))
+    #
+    # H = 164
+    # W = 164
+    # batch_size = 1
+    #
+    # if use_wmap:
+    #     wmap = Variable(wmap)
+    #
+    # # Calculate log probabilities
+    # logp = F.log_softmax(input)
+    # # logp = F.softmax(input)
+    # # logp = torch.exp(logp)
+    #
+    # # Gather log probabilities with respect to target
+    # logp = logp.gather(1, target.view(H * W, 6))    #  = softmaxed input - labels
+    #
+    # # Multiply with weights
+    # if use_wmap:
+    #     weighted_logp = (logp * wmap).view(batch_size, -1)
+    # else:
+    #     weighted_logp = logp.view(batch_size,-1)
+    #
+    # # Rescale so that loss is in approx. same interval
+    # # weighted_loss = weighted_logp.sum(1) / wmap.view(batch_size, -1).sum(1)
+    # weighted_loss = weighted_logp / (H * W)
+    # # weighted_loss = weighted_logp
+    #
+    # # Average over mini-batch
+    # weighted_loss = weighted_loss.mean()
+    #
+    # return -weighted_loss
 
 
 @weak_script
-def nll_loss(input, target, wmap=None, use_wmap=True, weight=None, size_average=None, ignore_index=-100,
+def nll_loss(output, target, wmap=None, weight=None, size_average=None, ignore_index=-100,
              reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
+    width = output.shape[1]
+    height = output.shape[2]
 
-    dim = input.dim()
+    logp = torch.log(softmax(output))
 
-    if dim != 2:
-        raise ValueError('Expected 2 dimensions (got {})'.format(dim))
-    if use_wmap:
-        if input.size(0) != target.size(0) or input.size(0) != wmap.size(0):
-            raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
-                             .format(input.size(0), target.size(0), wmap.size(0)))
-    else:
-        if input.size(0) != target.size(0):
-            raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
-                             .format(input.size(0), target.size(0), wmap.size(0)))
+    mistakes = check_mistakes(output, target)
 
-    H = 164
-    W = 164
-    batch_size = 1
+    loss = 0
+    classes = len(output[1,1,1,:])
+    for layer in range(classes):
+        loss += sum(mistakes * logp[layer] * wmap)
 
-    if use_wmap:
-        wmap = Variable(wmap)
+    return -loss / (width * height)
 
-    # Calculate log probabilities
-    logp = F.log_softmax(input)
-    # logp = F.softmax(input)
-    # logp = torch.exp(logp)
 
-    # Gather log probabilities with respect to target
-    logp = logp.gather(1, target.view(H * W, 6))    #  = softmaxed input - labels
+def softmax(output):
+    return torch.exp(output) / sum(torch.exp(output))
 
-    # Multiply with weights
-    if use_wmap:
-        weighted_logp = (logp * wmap).view(batch_size, -1)
-    else:
-        weighted_logp = logp.view(batch_size,-1)
 
-    # Rescale so that loss is in approx. same interval
-    # weighted_loss = weighted_logp.sum(1) / wmap.view(batch_size, -1).sum(1)
-    weighted_loss = weighted_logp / (H * W)
-    # weighted_loss = weighted_logp
+def check_mistakes(output, target):
+    input = torch.max(output, 3)
+    target = torch.max(target, 3)
 
-    # Average over mini-batch
-    weighted_loss = weighted_loss.mean()
-
-    return -weighted_loss
+    return torch.ne(input, target)

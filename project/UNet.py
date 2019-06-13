@@ -147,8 +147,8 @@ class UNet(nn.Module):
 def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
     model_name = 'stock_criterion_1ep'
 
-    # criterion = WeightedCrossEntropyLoss().to(device)
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = WeightedCrossEntropyLoss().to(device)
+    # criterion = nn.CrossEntropyLoss().to(device)
 
     optimizer = torch.optim.SGD(unet.parameters(), lr=10e-5, momentum=0.99)
     optimizer.zero_grad() # sets the gradient to accumulate instead of replace.
@@ -175,7 +175,6 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = normalize_input(sample['raw'][i], mean, var)
-                # raw = sample['raw'][i]
                 label = sample['label'][i]
                 wmap = sample['wmap'][i]
 
@@ -192,7 +191,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
                 # print(torch.max(label, 1).shape)
-                loss = criterion(output, torch.max(label, 1)[1])
+                loss = criterion(output, torch.max(label, 3)[1], wmap)
                 # loss = criterion(output, label, wmap=wmap, use_wmap=False)
                 loss.backward()
 
