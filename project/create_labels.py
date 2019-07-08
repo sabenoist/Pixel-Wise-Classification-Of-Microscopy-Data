@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
 import os
 import numpy as np
-import time
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -30,16 +29,27 @@ def create_borders(img):
     binary_image = image_to_binary(img)
     borders = get_cell_borders(binary_image)
 
+    # sets the border class to 3 and adds it to the ground-truth
     result_image = binary_image + 3 * borders
 
     return result_image
 
 
 def image_to_binary(img):
+    """
+    Converts the image parameter into a binary image
+    where any value above 0 is converted to 1.
+    """
     return 1 * (img > 0)
 
 
 def get_cell_borders(img):
+    """
+    Creates the border class by dilating the image
+    and then subtracting this dilated image from the
+    original image, creating an image that contains
+    only the border class.
+    """
     img_borders = img.copy()
 
     dilation_strength = 16
@@ -52,6 +62,11 @@ def get_cell_borders(img):
 
 
 def process_segmented_images(path):
+    """
+    Reads in all segmented images and adds to border class to them.
+    Afterward, saves the resulting images in the 'segmented_bordered'
+    directory.
+    """
     files = [a for a in os.listdir(path) if a.endswith('.tif')]
 
     for file in files:
@@ -62,6 +77,11 @@ def process_segmented_images(path):
 
 
 def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_classes=None):
+    """
+    Reads in all the ground-truth images from the 'segmented_bordered'
+    folder and converts these to one-hot ground-truth images that are
+    saved in the 'label' directory.
+    """
     make_dirs(out_path)
 
     files = [a for a in os.listdir(prediction_path) if a.endswith('.tif')]
@@ -82,7 +102,7 @@ def classification_to_one_hot_ground_truth(prediction_path, out_path, number_of_
 
 if __name__ == '__main__':
     process_segmented_images(paths['segmented_in_path'])
-    classification_to_one_hot_ground_truth(paths['label_in_path'], paths['label_dir'], number_of_classes = 5)
+    classification_to_one_hot_ground_truth(paths['label_in_path'], paths['label_dir'], number_of_classes=5)
 
 
 

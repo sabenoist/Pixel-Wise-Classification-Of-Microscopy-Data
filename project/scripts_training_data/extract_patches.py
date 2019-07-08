@@ -3,7 +3,7 @@ import os
 from skimage import io
 from skimage.transform import rescale
 from skimage.exposure import rescale_intensity
-import matplotlib.pyplot as plt
+
 
 def make_dirs(path):
     if not os.path.exists(path):
@@ -23,6 +23,7 @@ def make_random_numbers(params):
                 numbers[key] = np.random.randint(item[0], item[1])
     return numbers
 
+
 def load_files(params, frame):
 
     labels = io.imread('{}/{}'.format(params['label_dir'], frame))
@@ -31,13 +32,14 @@ def load_files(params, frame):
     raw = raw.astype(params['img_type'])
 
     if params['bin_image']:
-        h,w = raw.shape
+        h, w = raw.shape
         labels = labels.reshape(2, h//2, 2, w//2).mean(-1).mean(-1)
         raw = raw.reshape(2, h//2, 2, w//2).mean(-1).mean(-1)
 
     raw /= 2**16-1
 
     return raw, labels
+
 
 def pad(img, params):
     """to use patches from the edges of a given training image, 
@@ -51,10 +53,10 @@ def pad(img, params):
     
     if len(img.shape) == 3:
         # path the image dimensions, but not the classes
-        if np.argmin(img.shape)==0:
-            pad_list = ((0,0), (pad_size, pad_size), (pad_size, pad_size))
+        if np.argmin(img.shape) == 0:
+            pad_list = ((0, 0), (pad_size, pad_size), (pad_size, pad_size))
         else:
-            pad_list = ((pad_size, pad_size), (pad_size, pad_size), (0,0))
+            pad_list = ((pad_size, pad_size), (pad_size, pad_size), (0, 0))
         return np.pad(img, pad_list, 'reflect')
 
 
@@ -71,7 +73,7 @@ def transpose(img, R1):
         if len(img.shape) == 2:
             return img.T
         if len(img.shape) ==3:
-            return np.transpose(img, (1,0,2))
+            return np.transpose(img, (1, 0, 2))
 
 
 def rotate(img, R2):
@@ -81,10 +83,11 @@ def rotate(img, R2):
 def shift_contrast(img, R3, params):
     img = np.array((img)**R3).astype(params['img_type'])
     img = rescale_intensity(img, out_range=(0,1)).astype(params['img_type'])
+
     return img
 
 
-def add_noise(img, R4, R5): # made this a bit fancier. (previously, the same value was added to every pixel)
+def add_noise(img, R4, R5):
     """this function overlays noise sampled from a normal distribution. parameters of the normal distribution are
     random and the same in each image but different between images. """
     means = np.zeros(img.shape)
@@ -102,6 +105,7 @@ def augmentation(img, params, numbers, isbf=False):
     img = rescale_img(img, numbers['scaling'], params)
     img = transpose(img, numbers['transposing'])
     img = rotate(img, numbers['rotating'])
+
     if isbf:
         img = shift_contrast(img, numbers['contrast_shifting'], params)
         img = add_noise(img, numbers['noise_mean'], abs(numbers['noise_std']))
@@ -121,20 +125,21 @@ def extract_patches(raw, labels, params):
     offset = int((large_patch_size[0] - small_patch_size[0]) / 2)
 
     while not found:
-        # print('not found'
         y, x, = pick_patch(raw, large_patch_size)
-        found, label_patch = check_patch(labels, y,x, offset, params)
+        found, label_patch = check_patch(labels, y, x, offset, params)
         ctr += 1
         if ctr >= 10000:
-            found=True
+            found = True
             
-    raw_patch = raw[y:y+large_patch_size[0], x:x+ large_patch_size[1]]
+    raw_patch = raw[y:y + large_patch_size[0], x:x + large_patch_size[1]]
 
     return raw_patch, label_patch
+
 
 def pick_patch(img, large_patch_size):
     y = np.random.randint(0, img.shape[0] - large_patch_size[0])
     x = np.random.randint(0, img.shape[1] - large_patch_size[1])
+
     return y, x
 
 
@@ -147,17 +152,15 @@ def check_patch(img, y, x, offset, params):
     small_patch_size = params['output_patch_size']
     label_class = params['label_class']
 
-    patch = img[y+offset : y+offset + small_patch_size[0], x + offset : x + offset + small_patch_size[1]]#, :]
+    patch = img[y + offset: y + offset + small_patch_size[0], x + offset: x + offset + small_patch_size[1]]
 
-    if patch[:,:,label_class].sum() > params['min_pixels']:
-        # print('number of pixels with class {} in patch: {}'.format(label_class, patch[:,:,label_class].sum())
+    if patch[:, :, label_class].sum() > params['min_pixels']:
         return True, patch
     else: 
         return False, patch
 
 
 def gt_generation(params):
-    
     frame = params['frame']
     frame_number = int(frame.split('frame_')[1].split('.tif')[0])
 
@@ -170,8 +173,6 @@ def gt_generation(params):
     patch_multiplication_factor = params['augmentations_per_image'] * params['patches_per_augmentation']
 
     raw, labels = load_files(params, frame)
-
-    #labels = np.rollaxis(labels, 0, 3) 
 
     patch_counter = frame_number * patch_multiplication_factor
 
@@ -187,7 +188,6 @@ def gt_generation(params):
             patchname = str(patch_counter).zfill(6)
 
             io.imsave('{}/patch_{}.tif'.format(out_path_raw, patchname), raw_patch.astype(params['img_type']))
-            #print(label_patch.shape)
             io.imsave('{}/patch_{}.tif'.format(out_path_label, patchname), label_patch.astype(np.uint8))
 
             patch_counter += 1

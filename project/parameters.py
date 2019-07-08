@@ -1,5 +1,11 @@
 import numpy as np
 
+"""
+A separate file that I used to store all of the parameters
+used for both data_preparation and model training through-out
+all of my classes.
+"""
+
 def get_paths():
     dataset = '20190315_exp_1_pos_00'
     root_dir = 'E:/Bachelor_Project/VU_Bachelor_Project/project/datasets/{}/'.format(dataset)
