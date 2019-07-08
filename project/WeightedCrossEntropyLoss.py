@@ -2,6 +2,8 @@ from torch.nn.modules import Module
 from torch._jit_internal import weak_module, weak_script
 from torch.autograd.variable import Variable
 import torch
+import gc
+import time
 
 import torch.nn.functional as F
 import torch.nn._reduction as _Reduction
@@ -27,98 +29,65 @@ class _WeightedLoss(_Loss):
 class WeightedCrossEntropyLoss(_WeightedLoss):
     __constants__ = ['weight', 'ignore_index', 'reduction']
 
-    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
+    def __init__(self, device, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
         super(WeightedCrossEntropyLoss, self).__init__(weight, size_average, reduce, reduction)
+        self.device = device
         self.ignore_index = ignore_index
 
 
     def forward(self, input, target, wmap=None):
-        return weighted_cross_entropy(input, target, wmap=wmap, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
+        return self.weighted_cross_entropy(input, target, wmap)
+
+    @weak_script
+    def weighted_cross_entropy(self, output, target, wmap=None):
+
+        # pixels_amount = output.shape[0]
+
+        # logp = torch.log(self.softmax(output))
+        # p = F.softmax(input)
+        p = self.softmax(output)
+
+        # print(logp)
+
+        negatives, positives = self.check_mistakes(output, target)
+
+        loss = 0
+        classes = len(output[1,:])
+        for layer in range(classes):
+            if wmap is not None:
+                mistakes = negatives * p[:,layer]
+                correct = positives * (1 - p[:,layer])
+
+                loss += -torch.log(correct + mistakes).mean()
+
+            else:
+                mistakes = negatives * p[:, layer]
+                correct = positives * (1 - p[:, layer])
+
+                loss += -torch.log(correct + mistakes).mean()
 
 
-def weighted_cross_entropy(input, target, wmap=None, weight=None, size_average=None, ignore_index=-100,
-                  reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
-
-    if size_average is not None or reduce is not None:
-        reduction = _Reduction.legacy_get_string(size_average, reduce)
-    return nll_loss(input, target, wmap,  weight, None, ignore_index, None, reduction)
+        return loss / classes
 
 
-# @weak_script
-# def nll_loss(input, target, wmap=None, use_wmap=True, weight=None, size_average=None, ignore_index=-100,
-#              reduce=None, reduction='mean'):
-    # type: (Tensor, Tensor, Optional[Tensor], Optional[bool], Optional[Tensor], Optional[bool], int, Optional[bool], str) -> Tensor
-
-    # dim = input.dim()
-    #
-    # if dim != 2:
-    #     raise ValueError('Expected 2 dimensions (got {})'.format(dim))
-    # if use_wmap:
-    #     if input.size(0) != target.size(0) or input.size(0) != wmap.size(0):
-    #         raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
-    #                          .format(input.size(0), target.size(0), wmap.size(0)))
-    # else:
-    #     if input.size(0) != target.size(0):
-    #         raise ValueError('Expected input batch_size ({}) to match target batch_size ({}) and wmap batch_size ({}).'
-    #                          .format(input.size(0), target.size(0), wmap.size(0)))
-    #
-    # H = 164
-    # W = 164
-    # batch_size = 1
-    #
-    # if use_wmap:
-    #     wmap = Variable(wmap)
-    #
-    # # Calculate log probabilities
-    # logp = F.log_softmax(input)
-    # # logp = F.softmax(input)
-    # # logp = torch.exp(logp)
-    #
-    # # Gather log probabilities with respect to target
-    # logp = logp.gather(1, target.view(H * W, 6))    #  = softmaxed input - labels
-    #
-    # # Multiply with weights
-    # if use_wmap:
-    #     weighted_logp = (logp * wmap).view(batch_size, -1)
-    # else:
-    #     weighted_logp = logp.view(batch_size,-1)
-    #
-    # # Rescale so that loss is in approx. same interval
-    # # weighted_loss = weighted_logp.sum(1) / wmap.view(batch_size, -1).sum(1)
-    # weighted_loss = weighted_logp / (H * W)
-    # # weighted_loss = weighted_logp
-    #
-    # # Average over mini-batch
-    # weighted_loss = weighted_loss.mean()
-    #
-    # return -weighted_loss
+    def softmax(self, output):
+        return torch.exp(output) / torch.exp(output).sum()
 
 
-@weak_script
-def nll_loss(output, target, wmap=None, weight=None, size_average=None, ignore_index=-100,
-             reduce=None, reduction='mean'):
-    width = output.shape[1]
-    height = output.shape[2]
+    def check_mistakes(self, output, target):
+        output = torch.argmax(output, 1)
+        target = torch.argmax(target, 1)
 
-    logp = torch.log(softmax(output))
+        mistakes = torch.ne(output, target).type(torch.FloatTensor).to(device=self.device)
+        correct = torch.eq(output, target).type(torch.FloatTensor).to(device=self.device)
 
-    mistakes = check_mistakes(output, target)
-
-    loss = 0
-    classes = len(output[1,1,1,:])
-    for layer in range(classes):
-        loss += sum(mistakes * logp[layer] * wmap)
-
-    return -loss / (width * height)
+        return [mistakes, correct]
 
 
-def softmax(output):
-    return torch.exp(output) / sum(torch.exp(output))
-
-
-def check_mistakes(output, target):
-    input = torch.max(output, 3)
-    target = torch.max(target, 3)
-
-    return torch.ne(input, target)
+    def temp(self):
+        for obj in gc.get_objects():
+            try:
+                if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                    print(type(obj), obj.size())
+            except:
+                pass

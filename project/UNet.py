@@ -9,6 +9,12 @@ from PatchDataset import PatchDataset
 from WeightedCrossEntropyLoss import WeightedCrossEntropyLoss
 from SpatialWeightedSGD import SpatialWeightedSGD
 from torch.utils.data import DataLoader
+from torch.autograd import Variable
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import confusion_matrix
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -144,13 +150,18 @@ class UNet(nn.Module):
         return final_layer
 
 
-def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=1):
-    model_name = 'stock_criterion_1ep'
+def gradClamp(parameters, clip=5):
+    for p in parameters:
+        p.grad.data.clamp_(min=-clip, max=clip)
 
-    criterion = WeightedCrossEntropyLoss().to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(unet.parameters(), lr=10e-5, momentum=0.99)
+def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epochs=10):
+    model_name = 'Final_25_6_lr-9_stock'
+
+    # criterion = WeightedCrossEntropyLoss(device).to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    optimizer = torch.optim.SGD(unet.parameters(), lr=10e-9, momentum=0.99)
     optimizer.zero_grad() # sets the gradient to accumulate instead of replace.
 
     loss_info = list()
@@ -175,14 +186,14 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 # Forward part
                 patch_name = sample['patch_name'][i]
                 raw = normalize_input(sample['raw'][i], mean, var)
-                label = sample['label'][i]
+                label = Variable(sample['label'][i])
                 wmap = sample['wmap'][i]
 
                 output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
                 # Backwards part
                 output = output.permute(0, 2, 3, 1)  # permute such that number of desired segments would be on 4th dimension
-                label = label.unsqueeze(0)
+                label = label.unsqueeze(0)  # sets label to have the same dimensions as output
                 m = output.shape[0]
 
                 # Resizing the outputs and label to calculate pixel wise softmax loss
@@ -190,10 +201,10 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
                 label = label.resize(m * width_out * height_out, 6)
                 wmap = wmap.resize(m * width_out * height_out, 1)
 
-                # print(torch.max(label, 1).shape)
-                loss = criterion(output, torch.max(label, 3)[1], wmap)
-                # loss = criterion(output, label, wmap=wmap, use_wmap=False)
+                # loss = criterion(output, label, wmap=wmap)
+                loss = criterion(output, torch.argmax(label, 1))
                 loss.backward()
+                gradClamp(unet.parameters(), clip=5)
 
                 optimizer.step()
 
@@ -211,6 +222,10 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 
                 print('{}. [{}/{}] - {} loss: {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name, loss))
 
+                # save confusion matrix every end of the epoch
+                if patch_counter == patches_amount - 1:
+                    plot_confusion_matrix(torch.argmax(label, 1), torch.argmax(output, 1), epoch, title='learning rate 10^-9, epoch {}'.format(epoch + 1))
+
                 patch_counter += 1
 
     save_model(unet, paths['model_dir'], model_name + '.pickle')
@@ -221,7 +236,7 @@ def train_UNet(device, unet, dataset, validation_set, width_out, height_out, epo
 def run_validation(device, unet, validation_set, width_out, height_out):
     print("running validation test")
 
-    # validation_criterion = WeightedCrossEntropyLoss().to(device)
+    # validation_criterion = WeightedCrossEntropyLoss(device).to(device)
     validation_criterion = nn.CrossEntropyLoss().to(device)
 
     batch_size = 200
@@ -240,7 +255,8 @@ def run_validation(device, unet, validation_set, width_out, height_out):
         for i in range(batch_size):
             patch_name = sample['patch_name'][i]
             raw = normalize_input(sample['raw'][i], mean, var)
-            label = sample['label'][i]
+            # label = Variable(sample['label'][i])
+            label = Variable(sample['label'][i])
 
             output = unet(raw[None][None])  # None will add the missing dimensions at the front, the Unet requires a 4d input for the weights.
 
@@ -253,8 +269,9 @@ def run_validation(device, unet, validation_set, width_out, height_out):
             output = output.resize(m * width_out * height_out, 6)
             label = label.resize(m * width_out * height_out, 6)
 
-            # loss = validation_criterion(output, label, use_wmap=False)
-            loss = validation_criterion(output, torch.max(label, 1)[1])
+            # loss = validation_criterion(output, label)
+            # loss = validation_criterion(output, torch.max(label, 1)[1])
+            loss = validation_criterion(output, torch.argmax(label, 1))
 
             print('validation. [{}/{}] {} - loss: {}'.format(validation_counter + 1, validation_amount, patch_name, loss.item()))
 
@@ -303,6 +320,71 @@ def normalize_input(input, mean, var):
     if var <= 0:
         var = 1
     return input.add(-mean).div(var)
+
+
+def remove_buds(label):
+    label[label==2] = 1
+    return label
+
+
+def plot_confusion_matrix(y_true, y_pred, epoch, normalize=False, title=None, cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    classes = [0,1,2,3,4,5]
+    np.set_printoptions(precision=2)
+
+    y_true = y_true.cpu().numpy()
+    y_pred = y_pred.detach().cpu().numpy()
+
+    if not title:
+        if normalize:
+            title = 'Normalized confusion matrix'
+        else:
+            title = 'Confusion matrix, without normalization'
+
+    # Compute confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Only use the labels that appear in the data
+    # classes = classes[unique_labels(y_true, y_pred)]
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.figure.colorbar(im, ax=ax)
+
+    # We want to show all ticks...
+    ax.set(xticks=np.arange(cm.shape[1]),
+           yticks=np.arange(cm.shape[0]),
+           # ... and label them with the respective list entries
+           xticklabels=classes, yticklabels=classes,
+           title=title,
+           ylabel='True label',
+           xlabel='Predicted label')
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, format(cm[i, j], fmt),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    fig.tight_layout()
+    # return ax
+
+    # plt.show()
+
+    fig.savefig('confusion_matrices/' + str(epoch) + '.png')
+
 
 
 if __name__ == '__main__':
