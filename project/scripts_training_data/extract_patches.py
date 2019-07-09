@@ -11,6 +11,12 @@ def make_dirs(path):
 
 
 def make_random_numbers(params):
+    """
+    Returns a dictionary of random values for
+    each augmentation parameter based on the
+    given distribution in the params dictionary.
+    """
+
     numbers = {}
     for key in params.keys():
         item = params[key]
@@ -21,10 +27,16 @@ def make_random_numbers(params):
                 numbers[key] = np.random.normal(item[0], item[1])
             elif item[-1] == 'randint':
                 numbers[key] = np.random.randint(item[0], item[1])
+
     return numbers
 
 
 def load_files(params, frame):
+    """
+    Loads in the images from the raw and label
+    directories and applies the binning method
+    when applicable.
+    """
 
     labels = io.imread('{}/{}'.format(params['label_dir'], frame))
     labels = labels.astype(np.uint8)
@@ -42,9 +54,12 @@ def load_files(params, frame):
 
 
 def pad(img, params):
-    """to use patches from the edges of a given training image, 
+    """
+    To use patches from the edges of a given training image,
     the image is padded before patch extraction,
-    because outputs of U-net are smaller than inputs into it. """
+    because outputs of U-net are smaller than inputs into it.
+    """
+
     large_patch_size = params['input_patch_size']
     pad_size = int(large_patch_size[0]/2)
     
@@ -57,30 +72,52 @@ def pad(img, params):
             pad_list = ((0, 0), (pad_size, pad_size), (pad_size, pad_size))
         else:
             pad_list = ((pad_size, pad_size), (pad_size, pad_size), (0, 0))
+
         return np.pad(img, pad_list, 'reflect')
 
 
 def rescale_img(img, R0, params):
+    """
+    Rescales the image based on the scaling value
+    of parameter R0.
+    """
+
     img = img.astype(np.float32)
     img_resc = rescale(img, R0, order=0, preserve_range=True, mode='constant')
+
     return img_resc.astype(params['img_type'])
 
 
 def transpose(img, R1):
+    """
+    Transposes the image based on whether the binary
+    parameter R1 is set to True or False.
+    """
+
     if R1 == 0:
         return img
     else:
         if len(img.shape) == 2:
             return img.T
-        if len(img.shape) ==3:
+        if len(img.shape) == 3:
             return np.transpose(img, (1, 0, 2))
 
 
 def rotate(img, R2):
+    """
+    Rotates the image based on the rotation value
+    from parameter R2.
+    """
+
     return np.rot90(img, R2)
 
 
 def shift_contrast(img, R3, params):
+    """
+    Shifts the contrast of the image based on the
+    contrast shifting value from parameter R3.
+    """
+
     img = np.array((img)**R3).astype(params['img_type'])
     img = rescale_intensity(img, out_range=(0,1)).astype(params['img_type'])
 
@@ -88,8 +125,13 @@ def shift_contrast(img, R3, params):
 
 
 def add_noise(img, R4, R5):
-    """this function overlays noise sampled from a normal distribution. parameters of the normal distribution are
-    random and the same in each image but different between images. """
+    """
+    This function overlays noise sampled from a normal
+    distribution. parameters of the normal distribution
+    are random and the same in each image but different
+    between images.
+    """
+
     means = np.zeros(img.shape)
     means += R4
     sigma_squareds = np.zeros(img.shape)
@@ -101,6 +143,13 @@ def add_noise(img, R4, R5):
 
 
 def augmentation(img, params, numbers, isbf=False):
+    """
+    Performs the augmentations on the given image by first
+    padding it and then rescaling, transposing, and rotating it.
+    Based on the binary parameter isbf, contrast shifting and
+    noise addition may also be performed.
+    """
+
     img = pad(img, params)
     img = rescale_img(img, numbers['scaling'], params)
     img = transpose(img, numbers['transposing'])
@@ -114,8 +163,12 @@ def augmentation(img, params, numbers, isbf=False):
 
 
 def extract_patches(raw, labels, params):
-    """extracts patches from the labels image until a patch is found that matches the criteria.
-    Then, the corresponding brightfield and fluorescence patches are extracted. """
+    """
+    Extracts patches from the labels image until a patch
+    is found that matches the criteria. Then, the corresponding
+    bright-field and fluorescence patches are extracted.
+    """
+
     found = False
     ctr = 0
 
@@ -137,6 +190,11 @@ def extract_patches(raw, labels, params):
 
 
 def pick_patch(img, large_patch_size):
+    """
+    Picks a random coordinate from the image for
+    the patch extraction.
+    """
+
     y = np.random.randint(0, img.shape[0] - large_patch_size[0])
     x = np.random.randint(0, img.shape[1] - large_patch_size[1])
 
@@ -145,10 +203,13 @@ def pick_patch(img, large_patch_size):
 
 def check_patch(img, y, x, offset, params):
     """
-    check if the randomly generated patch has at least the specified number (min_pixel) number of pixels fro 
+    Checks if the randomly generated patch has at least
+    the specified number (min_pixel) number of pixels from
     the specified (label_class) class
-    return: patch and boolean. True if patch is ok, False if patch is not ok. 
+
+    return: patch and boolean. True if patch is ok, False if patch is not ok.
     """
+
     small_patch_size = params['output_patch_size']
     label_class = params['label_class']
 
@@ -161,6 +222,11 @@ def check_patch(img, y, x, offset, params):
 
 
 def gt_generation(params):
+    """
+    Generates the patches by first performing image augmentations
+    and then extracting the patches from these augmented images.
+    """
+
     frame = params['frame']
     frame_number = int(frame.split('frame_')[1].split('.tif')[0])
 

@@ -45,7 +45,7 @@ def image_to_binary(img):
 
 def get_cell_borders(img):
     """
-    Creates the border class by dilating the image
+    Generates the border class by dilating the image
     and then subtracting this dilated image from the
     original image, creating an image that contains
     only the border class.

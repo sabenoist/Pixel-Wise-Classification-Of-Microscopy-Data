@@ -36,6 +36,7 @@ class PatchDataset(Dataset):
         This function is also repeatedly called when you
         iterate over the PatchLoader class.
         """
+
         patch_name = self.file_names[idx]
 
         raw = torch.from_numpy(io.imread('{}/{}'.format(self.raw_path, patch_name)))

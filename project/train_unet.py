@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+import sys, getopt
 
 from device import select_device
 from parameters import get_paths
@@ -9,6 +10,7 @@ from WeightedCrossEntropyLoss import WeightedCrossEntropyLoss
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from UNet import UNet
+
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -23,6 +25,7 @@ def train_UNet(model_name, device, unet, training_set, validation_set, width_out
     mapping has not been implemented yet and for this the
     WeightedCrossEntropyLoss class should be used.
     """
+
     criterion = nn.CrossEntropyLoss().to(device)
 
     # the Stochastic Gradient Descent optimizer from Pytorch.
@@ -60,22 +63,22 @@ def train_UNet(model_name, device, unet, training_set, validation_set, width_out
                 label = label.resize(m * width_out * height_out, 6)
                 # wmap = wmap.resize(m * width_out * height_out, 1)  TODO: uncomment when wmap support has been implemented.
 
-                loss = criterion(output, torch.argmax(label, 1)) # Pytorch Cross-Entropy Loss function does not accept one-hot encoded ground-truths
-                loss.backward()
-                gradClamp(unet.parameters(), clip=5)
+                loss = criterion(output, torch.argmax(label, 1))  # Pytorch Cross-Entropy Loss function does not accept one-hot encoded ground-truths
+                loss.backward()  # performs the back-propagation of the loss value
+                grad_Clamp(unet.parameters(), clip=5)
 
                 optimizer.step() # performs the weight updates.
 
                 # save loss info per 100 images
-                if patch_counter % 99 == 0:
+                if patch_counter + 1 % 100 == 0:
                     loss_info.append([epoch * patches_amount, patch_counter, loss.item()])
 
                 # perform validation per 2000 images
-                if patch_counter % 1999 == 0:
+                if patch_counter + 1 % 2000 == 0:
                     validation_info.append([epoch * patches_amount, patch_counter, run_validation(device, unet, validation_set, width_out, height_out)])
 
                 # save model every 10000 images
-                if patch_counter % 10000 == 0 and patch_counter != 0:
+                if patch_counter + 1 % 10000 == 0 and patch_counter != 0:
                     save_model(unet, paths['model_dir'], model_name + '_epoch_' + str(epoch) + '_patch_' + str(patch_counter) + '.pickle')
 
                 print('{}. [{}/{}] - {} loss: {}'.format(epoch + 1, patch_counter + 1, patches_amount, patch_name, loss))
@@ -95,6 +98,7 @@ def run_validation(device, unet, validation_set, width_out, height_out):
     loss values are computed by using the built-in
     CrossEntropyLoss class from Pytorch.
     """
+
     print("running validation test")
 
     validation_criterion = nn.CrossEntropyLoss().to(device)
@@ -146,6 +150,7 @@ def save_model(unet, path, name):
     Saves the model in a pickle file so that it later can be used for
     classification or further training.
     """
+
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -156,6 +161,7 @@ def save_loss_info(loss_info, path, name):
     """
     Saves the collected loss value in a file for later inspection and plotting.
     """
+
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -172,6 +178,7 @@ def read_mean_var(training=True):
     """
     Reads the mean and variance from the patch_mean_var.txt file
     """
+
     if training:
         file = open('{}/patch_mean_var.txt'.format(paths['out_dir'])).readlines()
     else:
@@ -187,15 +194,17 @@ def normalize_input(input, mean, var):
     """
     Normalizes the input based on the mean and variance parameters.
     """
+
     if var <= 0:
         var = 1
     return input.add(-mean).div(var)
 
 
-def gradClamp(parameters, clip=5):
+def grad_Clamp(parameters, clip=5):
     """
     Puts clamps on the gradient to prevent it from exploding.
     """
+
     for p in parameters:
         p.grad.data.clamp_(min=-clip, max=clip)
 

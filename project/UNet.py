@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 # UNet layer sizes
 layer1_size = 64
 layer2_size = 128
@@ -12,6 +13,11 @@ layer5_size = 1024
 
 class UNet(nn.Module):
     def __init__(self, in_channel, out_channel):
+        """
+        The constructor sets-up the architecture of the U-net.
+        This architecture is dynamic, meaning that layers and
+        operations can be added and removed at all times.
+        """
         super(UNet, self).__init__()
 
         # Downwards encoding part
@@ -46,6 +52,9 @@ class UNet(nn.Module):
 
 
     def contracting_block(self, in_channels, out_channels, kernel_size=3):
+        """
+        Performs the encoding layer operations of the U-net.
+        """
         block = nn.Sequential(
             nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=out_channels),
             nn.ReLU(),
@@ -58,6 +67,9 @@ class UNet(nn.Module):
 
 
     def expansive_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
+        """
+        Performs the decoding layer operations of the U-net.
+        """
         block = nn.Sequential(
             nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel),
             nn.ReLU(),
@@ -72,6 +84,13 @@ class UNet(nn.Module):
 
 
     def final_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
+        """
+        Performs the operations of the final decoding layer.
+        These are the same operations as the other decoding
+        layers except for the extra 1x1 convolution at the
+        end that produces the desired amount of channels.
+        """
+
         block = nn.Sequential(
             nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel),
             nn.ReLU(),
@@ -87,6 +106,12 @@ class UNet(nn.Module):
 
 
     def crop_and_concat(self, upsampled, bypass, crop=False):
+        """
+        Performs the cropping and concatenation of the
+        encoding layer output with the corresponding
+        decoding layer.
+        """
+
         if crop:
             c = (bypass.size()[2] - upsampled.size()[2]) // 2
             bypass = F.pad(bypass, (-c, -c, -c, -c))
@@ -94,13 +119,22 @@ class UNet(nn.Module):
 
 
     def init_weights(self, m):
-        # Can be applied to convolution layers to initiate custom weights
+        """
+        Can be applied to the convolution layers to
+        initiate custom weights
+        """
+
         if type(m) == nn.Linear:
             torch.nn.init.xavier_uniform(m.weight)
             m.bias.data.fill_(0.01)
 
 
     def forward(self, input_img):
+        """
+        The method to be automatically called when forwarding
+        an image through the neural network.
+        """
+
         # Encode
         encode_block1 = self.conv_encode1(input_img)
         encode_pool1 = self.conv_maxpool1(encode_block1)
