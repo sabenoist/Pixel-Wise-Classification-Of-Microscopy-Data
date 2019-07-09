@@ -209,15 +209,64 @@ def grad_Clamp(parameters, clip=5):
         p.grad.data.clamp_(min=-clip, max=clip)
 
 
+def print_usage():
+    print('usage: train_unet.py -n <model name> -l <learning rate> -e <training epochs>')
+    print('or\nusage: train_unet.py --name <model name> --lr <learning rate> --ep <training epochs>')
+
+def get_arguments():
+    """
+    Parses the arguments from the commandline. Reads in the:
+    - model_name: -n or --name
+    - learning_rate: -l or --lr
+    - epochs: -e or --ep
+    """
+
+    try:
+        options, remainder = getopt.getopt(sys.argv[1:], "n:l:e:", ["name=", "lr=", "ep="])
+    except getopt.GetoptError:
+        print_usage()
+        sys.exit(2)
+
+    model_name = None
+    learning_rate = None
+    epochs = None
+
+    for opt, arg in options:
+        if opt in ('-n', '--name'):
+            model_name = arg
+        elif opt in ('-l', '--lr'):
+            try:
+                learning_rate = float(arg)
+            except:
+                print('error: the learning-rate must be a real number!')
+                sys.exit(2)
+        elif opt in ('-e', '--ep'):
+            try:
+                epochs = int(arg)
+            except:
+                print('error: the epoch amount must be an integer!')
+                sys.exit(2)
+
+    # checks if all arguments were present.
+    if None in (model_name, learning_rate, epochs):
+        print_usage()
+        sys.exit(2)
+
+    return model_name, learning_rate, epochs
+
+
 if __name__ == '__main__':
+    model_name, learning_rate, epochs = get_arguments()
+
     device = select_device(force_cpu=False)
 
-    unet = UNet(in_channel=1, out_channel=6)  # out_channel represents number of segments desired
+    unet = UNet(in_channel=1, out_channel=6)  # out_channel represents number of classes desired
     unet = unet.to(device)
 
     paths = get_paths()
 
-    training_set = PatchDataset(paths['out_dir'], device, use_wmap=False)  # TODO: use_wmap=True when implemented.
+    training_set = PatchDataset(paths['out_dir'], device, use_wmap=False)  # TODO: use_wmap=True when weight_maps are implemented.
     validation_set = PatchDataset(paths['val_dir'], device, use_wmap=False)
 
     train_UNet(model_name, device, unet, training_set, validation_set, width_out=164, height_out=164, epochs=epochs, lr=learning_rate)
+
