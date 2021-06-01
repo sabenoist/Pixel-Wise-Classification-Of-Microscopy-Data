@@ -1,7 +1,7 @@
 # VU_Bachelor_Project
-Sequence models for the analysis of time-lapse microscopy data.
+For my bachelor thesis I created an auto-encoding and decoding convolutional neural network for the pixel-wise classification of microscopy data that was to be used for the automation of medicine development. This project was done on behalf of the Systems Biology research group at the Vrije Universiteit Amsterdam.
 
-<b>Dependencies</b>
+##Dependencies
 <ul>
 	<li>pytorch</li>
 	<li>torchvision</li>
